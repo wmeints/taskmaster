@@ -24,3 +24,24 @@ Design logic modules (everything under `lib/` and other non-UI code) as deep mod
 - Keep implementation details (helpers, internal types, data access specifics) private to the module; export only what callers need.
 - Prefer fewer, more powerful functions over many shallow pass-through functions or thin wrappers.
 - Callers should not need to understand the module's internals or call functions in a particular order to use it correctly.
+
+# Development workflow
+
+## Red-green-refactor
+
+Write all code using the red-green-refactor cycle:
+
+1. **Red** — write a failing test that describes the next small piece of behavior. Run it and confirm it fails for the expected reason.
+2. **Green** — write the minimum code needed to make the test pass.
+3. **Refactor** — clean up the code and tests while keeping all tests green.
+
+Repeat in small increments. Do not write production code without a failing test that requires it.
+
+## Reuse shadcn components
+
+Use shadcn components as much as possible to promote reuse. Before building a new atom, check whether a shadcn component exists for it and add it with `npx shadcn@latest add <component>` into `components/ui/`. Compose molecules and organisms from these primitives rather than writing custom equivalents.
+
+## Testing
+
+- **Components** — write Storybook stories with interaction tests (`*.stories.tsx`, placed next to the component) for every component you add. Run them with `npm run test:ui`.
+- **Logic** — write Vitest unit tests (`*.test.ts`, placed next to the module) for any logic you add. Test through the module's public interface, not its internals. Run them with `npm run test:unit`.
