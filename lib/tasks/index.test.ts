@@ -11,6 +11,7 @@ import {
   createTask,
   deleteSubtask,
   deleteTask,
+  getOverview,
   getWorkspace,
   updateSubtask,
   updateTask,
@@ -145,6 +146,26 @@ describe("getWorkspace", () => {
     const workspace = await getWorkspace(userId, { view: "inbox" }, today)
 
     expect(workspace?.todo[0].subtasks).toEqual(subtasks)
+  })
+})
+
+describe("getOverview", () => {
+  it("counts open tasks per view and per list and lists them for search", async () => {
+    givenData([
+      taskRow({ id: taskId, title: "Buy paint", due_date: "2026-10-22", list_id: homeId }),
+      taskRow({ title: "Done already", due_date: today, completed: true, list_id: homeId }),
+    ])
+
+    const overview = await getOverview(userId, today)
+
+    expect(overview).toEqual({
+      counts: { inbox: 0, today: 0, tomorrow: 1, "end-of-week": 0, later: 0 },
+      lists: [
+        { id: websiteId, name: "Website relaunch", color: "blue", openCount: 0 },
+        { id: homeId, name: "Home renovation", color: "orange", openCount: 1 },
+      ],
+      searchable: [{ id: taskId, title: "Buy paint", view: "tomorrow" }],
+    })
   })
 })
 

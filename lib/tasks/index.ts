@@ -1,11 +1,12 @@
 import "server-only";
+import { cache } from "react";
 import { z } from "zod";
 import { pool } from "@/lib/db";
 import { dateForPreset, viewOf, type View } from "./deadlines";
 import type { TaskChanges } from "./schemas";
-import { listColors, viewTitles, type ListColor, type Scope, type Subtask, type Task, type Workspace } from "./types";
+import { listColors, viewTitles, type ListColor, type Overview, type Scope, type Subtask, type Task, type Workspace } from "./types";
 
-export type { List, Scope, Task, Workspace } from "./types";
+export type { List, Overview, Scope, Task, Workspace } from "./types";
 
 // Completed tasks stay visible in their view for this long.
 const completedRetention = "7 days";
@@ -23,17 +24,19 @@ type TaskRow = {
   subtasks: Subtask[];
 };
 
+// What the sidebar and search show for the user, whichever view or list is open.
+export async function getOverview(userId: string, today: string): Promise<Overview> {
+  const { overview } = await load(userId, today);
+  return overview;
+}
+
 // Everything the main screen shows for one view or list. Returns null for a list the user doesn't have.
 export async function getWorkspace(userId: string, scope: Scope, today: string): Promise<Workspace | null> {
   if ("listId" in scope && !z.uuid().safeParse(scope.listId).success) {
     return null;
   }
 
-  const [listRows, taskRows] = await Promise.all([findLists(userId), findTasks(userId)]);
-  const listsById = new Map(listRows.map((list) => [list.id, list]));
-  const tasks = taskRows.map((row) => toTask(row, listsById));
-  const open = tasks.filter((task) => !task.completed);
-
+  const { overview, tasks, listsById } = await load(userId, today);
   const title = "view" in scope ? viewTitles[scope.view] : listsById.get(scope.listId)?.name;
   if (title === undefined) {
     return null;
@@ -43,19 +46,33 @@ export async function getWorkspace(userId: string, scope: Scope, today: string):
     "view" in scope ? viewOf(task.due?.date ?? null, today) === scope.view : task.list?.id === scope.listId;
 
   return {
+    ...overview,
     title,
     scope,
     today,
+    todo: tasks.filter((task) => !task.completed && inScope(task)),
+    completed: tasks.filter((task) => task.completed && inScope(task)),
+  };
+}
+
+// The layout and the page both read the workspace while rendering one request; cache() lets them share
+// the queries.
+const load = cache(async (userId: string, today: string) => {
+  const [listRows, taskRows] = await Promise.all([findLists(userId), findTasks(userId)]);
+  const listsById = new Map(listRows.map((list) => [list.id, list]));
+  const tasks = taskRows.map((row) => toTask(row, listsById));
+  const open = tasks.filter((task) => !task.completed);
+
+  const overview: Overview = {
     counts: countByView(open, today),
     lists: listRows.map((list) => ({
       ...list,
       openCount: open.filter((task) => task.list?.id === list.id).length,
     })),
-    todo: open.filter(inScope),
-    completed: tasks.filter((task) => task.completed && inScope(task)),
     searchable: open.map((task) => ({ id: task.id, title: task.title, view: viewOf(task.due?.date ?? null, today) })),
   };
-}
+  return { overview, tasks, listsById };
+});
 
 // Adds a task to a view (taking that view's deadline) or to a list. Returns the new task's id.
 export async function createTask(

@@ -72,3 +72,14 @@ export const SignsOutFromTheAccountMenu: Story = {
     await waitFor(() => expect(args.signOutAction).toHaveBeenCalled())
   },
 }
+
+// Just clicked Tomorrow: it is highlighted and shows a spinner while the view loads.
+export const Pending: Story = {
+  args: { scope: { view: "tomorrow" }, pending: true },
+  play: async ({ canvas }) => {
+    const link = canvas.getByRole("link", { name: /Tomorrow/ })
+    await expect(link).toHaveAttribute("aria-current", "page")
+    await expect(link).toHaveAttribute("aria-busy", "true")
+    await expect(canvas.getByRole("link", { name: /Today/ })).not.toHaveAttribute("aria-busy")
+  },
+}

@@ -5,6 +5,7 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
+  --animate-loading-bar: loading-bar 1.2s ease-in-out infinite;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --font-sans: var(--font-sans);
@@ -126,5 +127,14 @@
   }
   html {
     @apply font-sans;
+  }
+}
+
+@keyframes loading-bar {
+  from {
+    left: -40%;
+  }
+  to {
+    left: 100%;
   }
 }

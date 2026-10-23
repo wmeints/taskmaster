@@ -37,22 +37,38 @@ function AppSidebar({
   counts,
   lists,
   scope,
+  pending = false,
   account,
   signOutAction,
   onSearch,
   onShowShortcuts,
   onCreateList,
+  onNavigate,
 }: {
   counts: Record<View, number>
   lists: List[]
-  scope: Scope
+  // The view or list on screen, if any.
+  scope: Scope | null
+  // The view or list in scope is still loading.
+  pending?: boolean
   account: React.ComponentProps<typeof AccountMenu>["account"]
   signOutAction: () => Promise<void>
   onSearch: () => void
   onShowShortcuts: () => void
   onCreateList: (values: ListValues) => Promise<{ id: string } | { error: string }>
+  // Takes over navigation to a view or list.
+  onNavigate?: (href: string) => void
 }) {
   const [addingList, setAddingList] = useState(false)
+
+  function item(href: string, active: boolean) {
+    return {
+      href,
+      active,
+      pending: active && pending,
+      onNavigate: onNavigate && (() => onNavigate(href)),
+    }
+  }
 
   async function createList(values: ListValues) {
     const result = await onCreateList(values)
@@ -75,11 +91,10 @@ function AppSidebar({
             return (
               <SidebarNavItem
                 key={view}
-                href={hrefFor({ view })}
+                {...item(hrefFor({ view }), scope !== null && "view" in scope && scope.view === view)}
                 label={viewTitles[view]}
                 count={counts[view]}
                 leading={<Icon aria-hidden />}
-                active={"view" in scope && scope.view === view}
               />
             )
           })}
@@ -105,11 +120,10 @@ function AppSidebar({
           {lists.map((list) => (
             <SidebarNavItem
               key={list.id}
-              href={hrefFor({ listId: list.id })}
+              {...item(hrefFor({ listId: list.id }), scope !== null && "listId" in scope && scope.listId === list.id)}
               label={list.name}
               count={list.openCount}
               leading={<ListDot color={list.color} />}
-              active={"listId" in scope && scope.listId === list.id}
             />
           ))}
         </ul>

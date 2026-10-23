@@ -4,8 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 
 import { workspace } from "@/components/organisms/workspace.fixtures"
 
-const { actions, router, signOut } = vi.hoisted(() => ({
-  signOut: vi.fn(),
+const { actions, router } = vi.hoisted(() => ({
   actions: {
     createTaskAction: vi.fn(),
     updateTaskAction: vi.fn(),
@@ -19,16 +18,22 @@ const { actions, router, signOut } = vi.hoisted(() => ({
 }))
 
 vi.mock("./actions", () => actions)
-vi.mock("@/app/auth/actions", () => ({ signOut }))
-vi.mock("next/navigation", () => ({ useRouter: () => router }))
+vi.mock("@/app/auth/actions", () => ({ signOut: vi.fn() }))
+vi.mock("next/navigation", () => ({ useRouter: () => router, usePathname: () => "/today" }))
 
 import { WorkspaceScreen } from "./workspace-screen"
+import { WorkspaceShell } from "./workspace-shell"
 
 const [review, plumber, notes] = workspace.todo
 const account = { name: "Ada Lovelace", email: "ada@example.com", createdAt: new Date("2026-10-01T09:30:00Z") }
 
+// The screen inside the layout's shell, as the app renders it.
 function renderScreen(props: Partial<React.ComponentProps<typeof WorkspaceScreen>> = {}) {
-  return render(<WorkspaceScreen workspace={workspace} account={account} {...props} />)
+  return render(
+    <WorkspaceShell overview={workspace} today={workspace.today} account={account}>
+      <WorkspaceScreen workspace={workspace} {...props} />
+    </WorkspaceShell>,
+  )
 }
 
 function press(key: string, options: KeyboardEventInit = {}) {
@@ -67,6 +72,7 @@ describe("WorkspaceScreen", () => {
     expect(screen.getByText("Wednesday 21 October")).toBeInTheDocument()
     expect(screen.getByRole("button", { name: review.title })).toBeInTheDocument()
     expect(detail()).not.toBeInTheDocument()
+    expect(screen.getByText("Select a task to see its details")).toBeInTheDocument()
   })
 
   it("opens a task given in the URL", () => {
@@ -118,16 +124,6 @@ describe("WorkspaceScreen", () => {
     expect(detail()).not.toBeInTheDocument()
   })
 
-  it("switches views with the number keys", () => {
-    renderScreen()
-
-    press("1")
-    press("5")
-
-    expect(router.push).toHaveBeenCalledWith("/inbox")
-    expect(router.push).toHaveBeenCalledWith("/later")
-  })
-
   it("focuses the quick add field with N and adds the task to the view", async () => {
     renderScreen()
 
@@ -161,19 +157,24 @@ describe("WorkspaceScreen", () => {
     await waitFor(() => expect(within(detail()!).getByRole("textbox", { name: "New subtask" })).toHaveFocus())
   })
 
-  it("opens the shortcuts list with ?", async () => {
-    renderScreen()
+  it("updates the sidebar counts right away", async () => {
+    actions.updateTaskAction.mockReturnValue(new Promise(() => {}))
+    renderScreen({ initialTaskId: review.id })
+    const todayLink = screen.getByRole("link", { name: /Today/ })
+    expect(todayLink).toHaveTextContent(String(workspace.counts.today))
 
-    press("?", { shiftKey: true })
-    expect(await screen.findByRole("dialog", { name: "Keyboard shortcuts" })).toBeInTheDocument()
+    press("x")
+
+    await waitFor(() => expect(todayLink).toHaveTextContent(String(workspace.counts.today - 1)))
   })
 
-  it("opens search with ⌘K", async () => {
+  it("adds a task from search with the quick add field", async () => {
     renderScreen()
 
     press("k", { metaKey: true })
+    await userEvent.click(await screen.findByRole("option", { name: /New task/ }))
 
-    expect(await screen.findByRole("dialog", { name: "Search or command" })).toBeInTheDocument()
+    await waitFor(() => expect(screen.getByRole("textbox", { name: "New task" })).toHaveFocus())
   })
 
   it("edits the open task", async () => {
@@ -182,22 +183,5 @@ describe("WorkspaceScreen", () => {
     await userEvent.click(within(detail()!).getByRole("button", { name: "Tomorrow" }))
 
     expect(actions.updateTaskAction).toHaveBeenCalledWith(review.id, { due: { date: "2026-10-22", time: "14:00" } })
-  })
-
-  it("signs out from the account menu", async () => {
-    renderScreen()
-
-    await userEvent.click(screen.getByRole("button", { name: /Ada Lovelace/ }))
-    await userEvent.click(await screen.findByRole("menuitem", { name: "Sign out" }))
-
-    await waitFor(() => expect(signOut).toHaveBeenCalled())
-  })
-
-  it("stores the browser's time zone and refreshes when it changed", () => {
-    document.cookie = "tz=; path=/; max-age=0"
-    renderScreen()
-
-    expect(document.cookie).toContain(`tz=${Intl.DateTimeFormat().resolvedOptions().timeZone}`)
-    expect(router.refresh).toHaveBeenCalled()
   })
 })

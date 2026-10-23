@@ -49,3 +49,14 @@ export const WithoutOpenTasks: Story = {
     await expect(canvas.getByRole("link", { name: "Today" })).not.toHaveTextContent("0")
   },
 }
+
+// Just clicked: highlighted with a spinner in place of the count until the view has loaded.
+export const Pending: Story = {
+  args: { active: true, pending: true },
+  play: async ({ canvas }) => {
+    const link = canvas.getByRole("link", { name: /Today/ })
+    await expect(link).toHaveAttribute("aria-busy", "true")
+    await expect(canvas.getByRole("status", { name: "Loading" })).toBeInTheDocument()
+    await expect(link).not.toHaveTextContent("3")
+  },
+}

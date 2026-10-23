@@ -1,18 +1,14 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite"
 import { expect } from "storybook/test"
 
-import { InlineAddForm } from "@/components/molecules/inline-add-form"
-import { ViewHeader } from "@/components/molecules/view-header"
+import { TaskDetailEmpty } from "@/components/molecules/task-detail-empty"
 import { AppSidebar } from "@/components/organisms/app-sidebar"
 import { ShortcutBar } from "@/components/organisms/shortcut-bar"
-import { TaskDetail } from "@/components/organisms/task-detail"
-import { TaskList } from "@/components/organisms/task-list"
+import { ViewSkeleton } from "@/components/organisms/view-skeleton"
 import { workspace } from "@/components/organisms/workspace.fixtures"
-import { newTaskSchema } from "@/lib/tasks/schemas"
 
+import { ViewTemplate } from "./view-template"
 import { WorkspaceTemplate } from "./workspace-template"
-
-const noop = async () => undefined
 
 const meta = {
   title: "Templates/WorkspaceTemplate",
@@ -20,9 +16,7 @@ const meta = {
   parameters: { layout: "fullscreen" },
   args: {
     sidebar: <div>Sidebar</div>,
-    footer: <div>Footer</div>,
-    children: <div>Main</div>,
-    detail: <div>Detail</div>,
+    children: <div>View</div>,
   },
 } satisfies Meta<typeof WorkspaceTemplate>
 
@@ -32,29 +26,21 @@ type Story = StoryObj<typeof meta>
 
 export const Default: Story = {
   play: async ({ canvas }) => {
-    await expect(canvas.getByRole("main")).toHaveTextContent("Main")
-    await expect(canvas.getByRole("complementary", { name: "Task details" })).toHaveTextContent("Detail")
     await expect(canvas.getByText("Sidebar")).toBeInTheDocument()
-    await expect(canvas.getByText("Footer")).toBeInTheDocument()
+    await expect(canvas.getByText("View")).toBeInTheDocument()
   },
 }
 
-export const WithoutDetail: Story = {
-  args: { detail: undefined },
-  play: async ({ canvas }) => {
-    await expect(canvas.queryByRole("complementary", { name: "Task details" })).not.toBeInTheDocument()
-  },
-}
-
-// The Today view from the design, with the first task open.
-export const Filled: Story = {
+// Switching to Tomorrow: the sidebar marks it as loading while the view shows its heading over a skeleton.
+export const LoadingView: Story = {
   parameters: { nextjs: { appDirectory: true } },
   args: {
     sidebar: (
       <AppSidebar
         counts={workspace.counts}
         lists={workspace.lists}
-        scope={workspace.scope}
+        scope={{ view: "tomorrow" }}
+        pending
         account={{ name: "You", email: "you@example.com", createdAt: new Date("2026-10-01T09:30:00Z") }}
         signOutAction={async () => {}}
         onSearch={() => {}}
@@ -62,40 +48,16 @@ export const Filled: Story = {
         onCreateList={async () => ({ id: "new" })}
       />
     ),
-    footer: <ShortcutBar />,
-    detail: (
-      <TaskDetail
-        task={workspace.todo[0]}
-        lists={workspace.lists}
-        today={workspace.today}
-        breadcrumb="Website relaunch / Today"
-        onClose={() => {}}
-        onChange={noop}
-        onDelete={() => {}}
-        onAddSubtask={noop}
-        onToggleSubtask={() => {}}
-        onDeleteSubtask={() => {}}
-      />
-    ),
     children: (
-      <>
-        <ViewHeader title="Today" subtitle="Wednesday 21 October" onNewTask={() => {}} />
-        <InlineAddForm label="New task" placeholder="Add a task to Today…" schema={newTaskSchema} onAdd={noop} />
-        <TaskList
-          todo={workspace.todo}
-          completed={workspace.completed}
-          today={workspace.today}
-          selectedId={workspace.todo[0].id}
-          hideCompleted={false}
-          onToggleHideCompleted={() => {}}
-          onSelect={() => {}}
-          onToggle={() => {}}
-        />
-      </>
+      <ViewTemplate busy footer={<ShortcutBar />} emptyDetail={<TaskDetailEmpty />}>
+        <ViewSkeleton heading={{ title: "Tomorrow", subtitle: "Thursday 22 October" }} />
+      </ViewTemplate>
     ),
   },
   play: async ({ canvas }) => {
-    await expect(canvas.getByRole("heading", { level: 1, name: "Today" })).toBeInTheDocument()
-    await expect(canvas.getByRole("complementary", { name: "Task details" })).toBeInTheDocument()
+    await expect(canvas.getByRole("link", { name: /Tomorrow/ })).toHaveAttribute("aria-busy", "true")
+    await expect(canvas.getByRole("heading", { level: 1, name: "Tomorrow" })).toBeInTheDocument()
+    await expect(canvas.getByRole("progressbar", { name: "Loading" })).toBeInTheDocument()
+    await expect(canvas.getByText("Select a task to see its details")).toBeInTheDocument()
   },
 }

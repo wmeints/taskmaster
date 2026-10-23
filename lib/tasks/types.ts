@@ -32,14 +32,18 @@ export type List = { id: string; name: string; color: ListColor; openCount: numb
 // What a workspace shows: one of the deadline views, or one of the user's lists.
 export type Scope = { view: View } | { listId: string }
 
-export type Workspace = {
+// What the sidebar and search show: open tasks across every view and list.
+export type Overview = {
+  counts: Record<View, number>
+  lists: List[]
+  // Every open task, so search can jump to tasks outside the current view.
+  searchable: { id: string; title: string; view: View }[]
+}
+
+export type Workspace = Overview & {
   title: string
   scope: Scope
   today: string
-  counts: Record<View, number>
-  lists: List[]
   todo: Task[]
   completed: Task[]
-  // Every open task, so search can jump to tasks outside the current view.
-  searchable: { id: string; title: string; view: View }[]
 }
