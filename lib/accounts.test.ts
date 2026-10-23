@@ -54,10 +54,10 @@ describe("getCurrentUser", () => {
     await expect(getCurrentUser()).resolves.toBeNull()
   })
 
-  it("returns the signed-in user's id and name without querying Postgres", async () => {
+  it("returns the signed-in user's id, name and email without querying Postgres", async () => {
     auth.getSession.mockResolvedValue({ data: { user } })
 
-    await expect(getCurrentUser()).resolves.toEqual({ id: "user-1", name: "Ada" })
+    await expect(getCurrentUser()).resolves.toEqual({ id: "user-1", name: "Ada", email: "ada@example.com" })
     expect(pool.query).not.toHaveBeenCalled()
   })
 })

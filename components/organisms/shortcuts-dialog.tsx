@@ -43,6 +43,7 @@ const groups: { title: string; shortcuts: { keys: string[]; label: string }[] }[
     title: "Lists and views",
     shortcuts: [
       { keys: ["H"], label: "Hide or show completed" },
+      { keys: ["⇧", "S"], label: "Share list" },
       { keys: ["⌘", "K"], label: "Command palette" },
       { keys: ["?"], label: "This overview" },
     ],

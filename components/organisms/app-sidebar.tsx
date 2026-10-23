@@ -39,9 +39,8 @@ function AppSidebar({
   signOutAction,
   onSearch,
   onShowShortcuts,
-  onCreateList,
-  onDeleteList,
   onNavigate,
+  ...listActions
 }: {
   counts: Record<View, number>
   lists: List[]
@@ -53,11 +52,12 @@ function AppSidebar({
   signOutAction: () => Promise<void>
   onSearch: () => void
   onShowShortcuts: () => void
-  onCreateList: React.ComponentProps<typeof ListNav>["onCreateList"]
-  onDeleteList?: React.ComponentProps<typeof ListNav>["onDeleteList"]
   // Takes over navigation to a view or list.
   onNavigate?: (href: string) => void
-}) {
+} & Pick<
+  React.ComponentProps<typeof ListNav>,
+  "invitations" | "onCreateList" | "onShareList" | "onDeleteList" | "onLeaveList" | "onRespondToInvitation"
+>) {
   const viewsId = useId()
 
   function item(href: string, active: boolean) {
@@ -94,14 +94,7 @@ function AppSidebar({
         </ul>
       </nav>
 
-      <ListNav
-        lists={lists}
-        scope={scope}
-        pending={pending}
-        onNavigate={onNavigate}
-        onCreateList={onCreateList}
-        onDeleteList={onDeleteList}
-      />
+      <ListNav lists={lists} scope={scope} pending={pending} onNavigate={onNavigate} {...listActions} />
 
       <div className="mt-auto flex flex-col gap-3">
         <button

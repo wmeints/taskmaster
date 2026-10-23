@@ -26,8 +26,8 @@ const taskId = "33333333-3333-4333-8333-333333333333"
 const subtaskId = "44444444-4444-4444-8444-444444444444"
 
 const listRows = [
-  { id: websiteId, name: "Website relaunch", color: "blue" },
-  { id: homeId, name: "Home renovation", color: "orange" },
+  { id: websiteId, name: "Website relaunch", color: "blue", owned: true },
+  { id: homeId, name: "Home renovation", color: "orange", owned: true },
 ]
 
 function taskRow(overrides: Record<string, unknown>) {
@@ -47,7 +47,7 @@ function taskRow(overrides: Record<string, unknown>) {
 // Answers the workspace's two reads: the user's lists and their tasks.
 function givenData(tasks: ReturnType<typeof taskRow>[], lists = listRows) {
   pool.query.mockImplementation(async (sql: string) =>
-    sql.includes("from lists") ? { rows: lists } : { rows: tasks },
+    sql.includes("from tasks") ? { rows: tasks } : { rows: lists },
   )
 }
 
@@ -85,6 +85,20 @@ describe("getWorkspace", () => {
     }
   })
 
+  it("also reads the lists shared with the user and the tasks in them", async () => {
+    givenData([taskRow({ title: "Pick a hosting provider", list_id: homeId })], [
+      { id: homeId, name: "Home renovation", color: "orange", owned: false },
+    ])
+
+    const workspace = await getWorkspace(userId, { listId: homeId }, today)
+
+    expect(workspace?.lists[0]).toMatchObject({ id: homeId, owned: false })
+    expect(workspace?.todo[0].list).toEqual({ id: homeId, name: "Home renovation", color: "orange" })
+    for (const [sql] of pool.query.mock.calls) {
+      expect(sql).toContain("list_members")
+    }
+  })
+
   it("counts open tasks per view and per list", async () => {
     givenData([
       taskRow({ due_date: null }),
@@ -100,8 +114,8 @@ describe("getWorkspace", () => {
 
     expect(workspace?.counts).toEqual({ inbox: 1, today: 2, tomorrow: 1, "end-of-week": 1, later: 1 })
     expect(workspace?.lists).toEqual([
-      { id: websiteId, name: "Website relaunch", color: "blue", openCount: 2 },
-      { id: homeId, name: "Home renovation", color: "orange", openCount: 1 },
+      { id: websiteId, name: "Website relaunch", color: "blue", owned: true, openCount: 2 },
+      { id: homeId, name: "Home renovation", color: "orange", owned: true, openCount: 1 },
     ])
   })
 
@@ -165,8 +179,8 @@ describe("getOverview", () => {
     expect(overview).toEqual({
       counts: { inbox: 0, today: 0, tomorrow: 1, "end-of-week": 0, later: 0 },
       lists: [
-        { id: websiteId, name: "Website relaunch", color: "blue", openCount: 0 },
-        { id: homeId, name: "Home renovation", color: "orange", openCount: 1 },
+        { id: websiteId, name: "Website relaunch", color: "blue", owned: true, openCount: 0 },
+        { id: homeId, name: "Home renovation", color: "orange", owned: true, openCount: 1 },
       ],
       searchable: [
         { id: taskId, title: "Buy paint", view: "tomorrow", completed: false },
@@ -213,6 +227,12 @@ describe("createTask", () => {
     expect(pool.query.mock.calls[0][1]).toEqual([userId, "Buy paint", null, homeId, null])
   })
 
+  it("can add a task to a list shared with the user", async () => {
+    await createTask(userId, { title: "Buy paint", scope: { listId: homeId }, today })
+
+    expect(pool.query.mock.calls[0][0]).toContain("list_members")
+  })
+
   it("creates a new list for the task in the same statement", async () => {
     await createTask(userId, { title: "Plan trip", scope: { listId: homeId }, today, newList: "Summer holiday" })
 
@@ -245,13 +265,14 @@ describe("createTask", () => {
 })
 
 describe("updateTask", () => {
-  it("only changes the given fields of the user's task", async () => {
+  it("only changes the given fields of a task the user can access", async () => {
     pool.query.mockResolvedValue({ rows: [] })
 
     await updateTask(userId, taskId, { title: "New title", completed: true })
 
     const [sql, params] = pool.query.mock.calls[0]
-    expect(sql).toMatch(/update tasks set title = \$3, completed_at = .* where id = \$2 and user_id = \$1/)
+    expect(sql).toMatch(/update tasks set title = \$3, completed_at = .* where id = \$2 and \(user_id = \$1 or list_id in/)
+    expect(sql).toContain("list_members")
     expect(params).toEqual([userId, taskId, "New title", true])
   })
 
@@ -265,12 +286,12 @@ describe("updateTask", () => {
     expect(pool.query.mock.calls[1][1]).toEqual([userId, taskId, null, null])
   })
 
-  it("only moves the task to a list the user owns", async () => {
+  it("only moves the task to a list the user owns or was given access to", async () => {
     pool.query.mockResolvedValue({ rows: [] })
 
     await updateTask(userId, taskId, { listId: homeId })
 
-    expect(pool.query.mock.calls[0][0]).toContain("list_id = (select id from lists where id = $3 and user_id = $1)")
+    expect(pool.query.mock.calls[0][0]).toMatch(/list_id = \(select id from lists where id = \$3 and \(user_id = \$1 or id in \(select list_id from list_members where user_id = \$1\)\)\)/)
   })
 
   it("does nothing without changes", async () => {
@@ -281,12 +302,15 @@ describe("updateTask", () => {
 })
 
 describe("deleteTask", () => {
-  it("deletes the user's task", async () => {
+  it("deletes a task the user can access", async () => {
     pool.query.mockResolvedValue({ rows: [] })
 
     await deleteTask(userId, taskId)
 
-    expect(pool.query).toHaveBeenCalledWith(expect.stringMatching(/delete from tasks .*user_id = \$1/), [userId, taskId])
+    expect(pool.query).toHaveBeenCalledWith(expect.stringMatching(/delete from tasks [^]*user_id = \$1[^]*list_members/), [
+      userId,
+      taskId,
+    ])
   })
 })
 
@@ -295,28 +319,29 @@ describe("subtasks", () => {
     pool.query.mockResolvedValue({ rows: [] })
   })
 
-  it("adds a subtask to the user's task", async () => {
+  it("adds a subtask to a task the user can access", async () => {
     await addSubtask(userId, taskId, "Leave review comments")
 
     const [sql, params] = pool.query.mock.calls[0]
     expect(sql).toContain("insert into subtasks")
     expect(sql).toContain("user_id = $1")
+    expect(sql).toContain("list_members")
     expect(params).toEqual([userId, taskId, "Leave review comments"])
   })
 
-  it("checks off a subtask of the user's task", async () => {
+  it("checks off a subtask of a task the user can access", async () => {
     await updateSubtask(userId, subtaskId, { done: true })
 
     const [sql, params] = pool.query.mock.calls[0]
-    expect(sql).toContain("select id from tasks where user_id = $1")
+    expect(sql).toContain("select id from tasks where user_id = $1 or list_id in")
     expect(params).toEqual([userId, subtaskId, true])
   })
 
-  it("deletes a subtask of the user's task", async () => {
+  it("deletes a subtask of a task the user can access", async () => {
     await deleteSubtask(userId, subtaskId)
 
     const [sql, params] = pool.query.mock.calls[0]
-    expect(sql).toContain("select id from tasks where user_id = $1")
+    expect(sql).toContain("select id from tasks where user_id = $1 or list_id in")
     expect(params).toEqual([userId, subtaskId])
   })
 })

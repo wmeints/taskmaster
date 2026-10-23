@@ -6,6 +6,7 @@ import { ViewSkeleton } from "@/components/organisms/view-skeleton";
 import { ViewTemplate } from "@/components/templates/view-template";
 import { WorkspaceTemplate } from "@/components/templates/workspace-template";
 import { getCurrentAccount } from "@/lib/accounts";
+import { getSharing } from "@/lib/sharing";
 import { getOverview } from "@/lib/tasks";
 import { getToday } from "./today";
 import { WorkspaceShell } from "./workspace-shell";
@@ -38,12 +39,13 @@ async function Workspace({ children }: { children: React.ReactNode }) {
   }
 
   const today = await getToday();
-  const overview = await getOverview(account.id, today);
+  const [overview, sharing] = await Promise.all([getOverview(account.id, today), getSharing(account)]);
   return (
     <WorkspaceShell
       overview={overview}
       today={today}
       account={{ name: account.name, email: account.email, createdAt: account.createdAt }}
+      sharing={sharing}
     >
       {children}
     </WorkspaceShell>

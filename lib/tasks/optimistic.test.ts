@@ -35,8 +35,8 @@ const workspace: Workspace = {
   today,
   counts: { inbox: 0, today: 2, tomorrow: 0, "end-of-week": 0, later: 0 },
   lists: [
-    { ...website, openCount: 1 },
-    { ...home, openCount: 1 },
+    { ...website, owned: true, openCount: 1 },
+    { ...home, owned: true, openCount: 1 },
   ],
   todo: [review, plumber],
   completed: [bill],

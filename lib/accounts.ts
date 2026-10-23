@@ -9,7 +9,7 @@ export type Account = {
   createdAt: Date | null;
 };
 
-export type User = { id: string; name: string };
+export type User = { id: string; name: string; email: string };
 
 // Returns who is signed in, or null; cheaper than getCurrentAccount because it skips Postgres.
 export async function getCurrentUser(): Promise<User | null> {
@@ -18,8 +18,8 @@ export async function getCurrentUser(): Promise<User | null> {
     return null;
   }
 
-  const { id, name } = session.user;
-  return { id, name };
+  const { id, name, email } = session.user;
+  return { id, name, email };
 }
 
 // Returns the signed-in user's account, or null when nobody is signed in.

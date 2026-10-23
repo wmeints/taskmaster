@@ -46,7 +46,7 @@ const account = { name: "Ada Lovelace", email: "ada@example.com", createdAt: new
 // The screen inside the layout's shell, as the app renders it.
 function renderScreen(props: Partial<React.ComponentProps<typeof WorkspaceScreen>> = {}) {
   return render(
-    <WorkspaceShell overview={workspace} today={workspace.today} account={account}>
+    <WorkspaceShell overview={workspace} today={workspace.today} account={account} sharing={{ invitations: [], lists: {} }}>
       <WorkspaceScreen workspace={workspace} {...props} />
     </WorkspaceShell>,
   )

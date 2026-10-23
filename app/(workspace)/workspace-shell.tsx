@@ -10,6 +10,7 @@ import { CommandMenu } from "@/components/organisms/command-menu";
 import { ListNav } from "@/components/organisms/list-nav";
 import { MobileTabBar, type MobileTab } from "@/components/organisms/mobile-tab-bar";
 import { MoreMenu } from "@/components/organisms/more-menu";
+import { ShareListDialog } from "@/components/organisms/share-list-dialog";
 import { ShortcutBar } from "@/components/organisms/shortcut-bar";
 import { ShortcutsDialog } from "@/components/organisms/shortcuts-dialog";
 import { ViewSkeleton } from "@/components/organisms/view-skeleton";
@@ -17,11 +18,22 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { ViewTemplate } from "@/components/templates/view-template";
 import { WorkspaceTemplate } from "@/components/templates/workspace-template";
 import { useShortcuts } from "@/hooks/use-shortcuts";
+import type { Sharing } from "@/lib/sharing/types";
 import { timeZoneCookie } from "@/lib/tasks/deadlines";
 import { headingFor } from "@/lib/tasks/headings";
 import { hrefFor, scopeFor } from "@/lib/tasks/routes";
 import { plannerViews, viewTitles, type Overview, type Scope, type View } from "@/lib/tasks/types";
-import { createListAction, deleteListAction, quickAddTaskAction } from "./actions";
+import {
+  createListAction,
+  deleteListAction,
+  inviteToListAction,
+  leaveListAction,
+  quickAddTaskAction,
+  removeMemberAction,
+  resendInviteAction,
+  respondToInvitationAction,
+  revokeInviteAction,
+} from "./actions";
 
 // Sidebar numbers predicted by the open view while a change is on its way to the server.
 type Prediction = Pick<Overview, "counts" | "lists">;
@@ -38,18 +50,20 @@ type MobileSheet = "menu" | "lists" | "more";
 
 const ShellContext = createContext<Shell | null>(null);
 
-// What every signed-in route shares: the sidebar, search, the shortcuts list and the shortcuts that work
-// in any view. The layout renders it once, so it stays put while the user moves between views and lists.
+// What every signed-in route shares: the sidebar, search, the shortcuts list, sharing lists and the
+// shortcuts that work in any view. The layout renders it once, so it stays put while the user moves between views and lists.
 // While the next view loads, it shows that view's heading over a skeleton of its tasks.
 export function WorkspaceShell({
   overview,
   today,
   account,
+  sharing,
   children,
 }: {
   overview: Overview;
   today: string;
   account: React.ComponentProps<typeof AppSidebar>["account"];
+  sharing: Sharing;
   children: React.ReactNode;
 }) {
   const router = useRouter();
@@ -57,6 +71,9 @@ export function WorkspaceShell({
   const [searchOpen, setSearchOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [sheet, setSheet] = useState<MobileSheet | null>(null);
+  // The list whose share dialog is open; it outlives shareOpen so the dialog keeps its content while closing.
+  const [shareListId, setShareListId] = useState<string | null>(null);
+  const [shareOpen, setShareOpen] = useState(false);
   const [prediction, predict] = useOptimistic<Prediction | null, Prediction>(null, (_, next) => next);
   const [navigating, startNavigation] = useTransition();
   const [destination, setDestination] = useState<Scope | null>(null);
@@ -65,6 +82,7 @@ export function WorkspaceShell({
   const loading = navigating ? destination : null;
   const current = scopeFor(pathname);
   const shown = loading ?? current;
+  const sharedList = lists.find((list) => list.id === shareListId && list.owned);
 
   useTimeZoneCookie(router.refresh);
 
@@ -75,8 +93,18 @@ export function WorkspaceShell({
     startNavigation(() => router.push(href));
   }
 
+  function share(listId: string) {
+    setSheet(null);
+    setShareListId(listId);
+    setShareOpen(true);
+  }
+
   useShortcuts({
     "?": () => setShortcutsOpen(true),
+    "shift+s": () => {
+      const list = current && "listId" in current && lists.find((l) => l.id === current.listId);
+      if (list && list.owned) share(list.id);
+    },
     "mod+k": () => setSearchOpen(true),
     ...Object.fromEntries(
       (Object.keys(viewTitles) as View[]).map((view, index) => [String(index + 1), () => navigate(hrefFor({ view }))]),
@@ -93,8 +121,11 @@ export function WorkspaceShell({
     setShortcutsOpen(true);
   }
 
+  const viewing = (listId: string) => current !== null && "listId" in current && current.listId === listId;
+
   const listProps = {
     lists,
+    invitations: sharing.invitations,
     scope: shown,
     pending: loading !== null,
     onNavigate: navigate,
@@ -103,8 +134,10 @@ export function WorkspaceShell({
       if ("id" in result) navigate(hrefFor({ listId: result.id }));
       return result;
     },
-    onDeleteList: (listId: string) =>
-      deleteListAction(listId, { leave: current !== null && "listId" in current && current.listId === listId }),
+    onShareList: share,
+    onDeleteList: (listId: string) => deleteListAction(listId, { leave: viewing(listId) }),
+    onLeaveList: (listId: string) => leaveListAction(listId, { leave: viewing(listId) }),
+    onRespondToInvitation: (inviteId: string, accept: boolean) => respondToInvitationAction(inviteId, { accept }),
   };
 
   const sidebar = (
@@ -194,6 +227,19 @@ export function WorkspaceShell({
         onAddTask={quickAddTaskAction}
       />
       <ShortcutsDialog open={shortcutsOpen} onOpenChange={setShortcutsOpen} />
+      {sharedList && (
+        <ShareListDialog
+          open={shareOpen}
+          onOpenChange={setShareOpen}
+          listName={sharedList.name}
+          owner={account}
+          access={sharing.lists[sharedList.id] ?? { members: [], invites: [] }}
+          onInvite={(values) => inviteToListAction(sharedList.id, values)}
+          onResend={resendInviteAction}
+          onRevoke={revokeInviteAction}
+          onRemove={(memberId) => removeMemberAction(sharedList.id, memberId)}
+        />
+      )}
     </ShellContext>
   );
 }

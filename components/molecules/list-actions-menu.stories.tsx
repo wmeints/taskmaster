@@ -8,6 +8,7 @@ const meta = {
   component: ListActionsMenu,
   args: {
     listName: "Reading",
+    onShare: fn(),
     onDelete: fn(async (): Promise<{ error: string } | void> => undefined),
   },
 } satisfies Meta<typeof ListActionsMenu>
@@ -25,6 +26,32 @@ async function chooseDelete(canvas: { getByRole: typeof screen.getByRole }, user
 export const Default: Story = {
   play: async ({ canvas }) => {
     await expect(canvas.getByRole("button", { name: "Actions for Reading" })).toBeInTheDocument()
+  },
+}
+
+export const Shares: Story = {
+  play: async ({ args, canvas, userEvent }) => {
+    await userEvent.click(canvas.getByRole("button", { name: "Actions for Reading" }))
+    await userEvent.click(await screen.findByRole("menuitem", { name: "Share list…" }))
+
+    await expect(args.onShare).toHaveBeenCalledOnce()
+  },
+}
+
+// Someone the list was shared with can leave it, but not share or delete it.
+export const SharedWithMe: Story = {
+  args: { onShare: undefined, onDelete: undefined, onLeave: fn(async () => undefined) },
+  play: async ({ args, canvas, userEvent }) => {
+    await userEvent.click(canvas.getByRole("button", { name: "Actions for Reading" }))
+    await expect((await screen.findAllByRole("menuitem")).map((item) => item.textContent)).toEqual(["Leave list…"])
+    await userEvent.click(screen.getByRole("menuitem", { name: "Leave list…" }))
+
+    const dialog = await screen.findByRole("alertdialog", { name: "Leave “Reading”?" })
+    await expect(dialog).toHaveTextContent("You'll need a new invite to see its tasks again.")
+    await userEvent.click(screen.getByRole("button", { name: "Leave list" }))
+
+    await expect(args.onLeave).toHaveBeenCalledOnce()
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument())
   },
 }
 

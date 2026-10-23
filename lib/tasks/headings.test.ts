@@ -4,8 +4,8 @@ import { headingFor } from "./headings"
 
 const today = "2026-10-21"
 const lists = [
-  { id: "list-1", name: "Website relaunch", color: "blue" as const, openCount: 4 },
-  { id: "list-2", name: "Reading", color: "emerald" as const, openCount: 1 },
+  { id: "list-1", name: "Website relaunch", color: "blue" as const, owned: true, openCount: 4 },
+  { id: "list-2", name: "Reading", color: "emerald" as const, owned: true, openCount: 1 },
 ]
 
 describe("headingFor", () => {

@@ -11,7 +11,13 @@ export type { List, Overview, Scope, Task, Workspace } from "./types";
 // Completed tasks stay visible in their view for this long.
 const completedRetention = "7 days";
 
-type ListRow = { id: string; name: string; color: ListColor };
+// The lists the user in $1 owns or was given access to, and the tasks they can see and change: their own
+// and every task in those lists.
+const ownedOrShared = "user_id = $1 or id in (select list_id from list_members where user_id = $1)";
+const accessibleTasks = `select id from tasks where user_id = $1 or list_id in (select id from lists where ${ownedOrShared})`;
+const accessibleTask = `(user_id = $1 or list_id in (select id from lists where ${ownedOrShared}))`;
+
+type ListRow = { id: string; name: string; color: ListColor; owned: boolean };
 
 type TaskRow = {
   id: string;
@@ -108,7 +114,7 @@ export async function createTask(
          values ($1, $2, $3, (select id from new_list), $5)
          returning id`
       : `insert into tasks (user_id, title, due_date, list_id, due_time)
-         values ($1, $2, $3, (select id from lists where id = $4 and user_id = $1), $5)
+         values ($1, $2, $3, (select id from lists where id = $4 and (${ownedOrShared})), $5)
          returning id`,
     [userId, title, due?.date ?? null, newList ?? listId, due?.time ?? null, ...(newList ? [[...listColors]] : [])],
   );
@@ -126,8 +132,8 @@ export async function updateTask(userId: string, taskId: string, changes: TaskCh
     assignments.push(`due_date = ${param(changes.due?.date ?? null)}`, `due_time = ${param(changes.due?.time ?? null)}`);
   }
   if (changes.listId !== undefined) {
-    // A list id the user doesn't own resolves to no list rather than leaking into someone else's.
-    assignments.push(`list_id = (select id from lists where id = ${param(changes.listId)} and user_id = $1)`);
+    // A list id the user can't access resolves to no list rather than leaking into someone else's.
+    assignments.push(`list_id = (select id from lists where id = ${param(changes.listId)} and (${ownedOrShared}))`);
   }
   if (changes.completed !== undefined) {
     assignments.push(`completed_at = case when ${param(changes.completed)} then coalesce(completed_at, now()) end`);
@@ -136,16 +142,16 @@ export async function updateTask(userId: string, taskId: string, changes: TaskCh
   if (assignments.length === 0) {
     return;
   }
-  await pool.query(`update tasks set ${assignments.join(", ")} where id = $2 and user_id = $1`, params);
+  await pool.query(`update tasks set ${assignments.join(", ")} where id = $2 and ${accessibleTask}`, params);
 }
 
 export async function deleteTask(userId: string, taskId: string): Promise<void> {
-  await pool.query("delete from tasks where id = $2 and user_id = $1", [userId, taskId]);
+  await pool.query(`delete from tasks where id = $2 and ${accessibleTask}`, [userId, taskId]);
 }
 
 export async function addSubtask(userId: string, taskId: string, title: string): Promise<void> {
   await pool.query(
-    "insert into subtasks (task_id, title) select id, $3 from tasks where id = $2 and user_id = $1",
+    `insert into subtasks (task_id, title) select id, $3 from tasks where id = $2 and ${accessibleTask}`,
     [userId, taskId, title],
   );
 }
@@ -153,14 +159,14 @@ export async function addSubtask(userId: string, taskId: string, title: string):
 export async function updateSubtask(userId: string, subtaskId: string, { done }: { done: boolean }): Promise<void> {
   await pool.query(
     `update subtasks set done = $3
-     where id = $2 and task_id in (select id from tasks where user_id = $1)`,
+     where id = $2 and task_id in (${accessibleTasks})`,
     [userId, subtaskId, done],
   );
 }
 
 export async function deleteSubtask(userId: string, subtaskId: string): Promise<void> {
   await pool.query(
-    "delete from subtasks where id = $2 and task_id in (select id from tasks where user_id = $1)",
+    `delete from subtasks where id = $2 and task_id in (${accessibleTasks})`,
     [userId, subtaskId],
   );
 }
@@ -178,20 +184,21 @@ function insertList(name: string, colors: string): string {
      returning id`;
 }
 
-// Deletes the user's list. Its tasks stay, without a list (the foreign key sets list_id to null).
+// Deletes a list the user owns. Its tasks stay, without a list (the foreign key sets list_id to null).
 export async function deleteList(userId: string, listId: string): Promise<void> {
   await pool.query("delete from lists where id = $2 and user_id = $1", [userId, listId]);
 }
 
 async function findLists(userId: string): Promise<ListRow[]> {
   const { rows } = await pool.query<ListRow>(
-    "select id, name, color from lists where user_id = $1 order by created_at",
+    `select id, name, color, user_id = $1 as owned from lists where ${ownedOrShared} order by created_at`,
     [userId],
   );
   return rows;
 }
 
-// Open tasks plus recently completed ones, earliest deadline first.
+// Open tasks plus recently completed ones, earliest deadline first: the user's own and those in lists shared
+// with them.
 async function findTasks(userId: string): Promise<TaskRow[]> {
   const { rows } = await pool.query<TaskRow>(
     `select t.id, t.title, t.description, t.due_date::text as due_date,
@@ -203,7 +210,8 @@ async function findTasks(userId: string): Promise<TaskRow[]> {
             ) as subtasks
      from tasks t
      left join subtasks s on s.task_id = t.id
-     where t.user_id = $1 and (t.completed_at is null or t.completed_at > now() - interval '${completedRetention}')
+     where (t.user_id = $1 or t.list_id in (select id from lists where ${ownedOrShared}))
+       and (t.completed_at is null or t.completed_at > now() - interval '${completedRetention}')
      group by t.id
      order by t.completed_at desc nulls first, t.due_date nulls last, t.due_time nulls last, t.created_at`,
     [userId],
@@ -212,12 +220,13 @@ async function findTasks(userId: string): Promise<TaskRow[]> {
 }
 
 function toTask(row: TaskRow, listsById: Map<string, ListRow>): Task {
+  const list = row.list_id ? listsById.get(row.list_id) : undefined;
   return {
     id: row.id,
     title: row.title,
     description: row.description,
     due: row.due_date ? { date: row.due_date, time: row.due_time } : null,
-    list: (row.list_id && listsById.get(row.list_id)) || null,
+    list: list ? { id: list.id, name: list.name, color: list.color } : null,
     completed: row.completed,
     subtasks: row.subtasks,
   };

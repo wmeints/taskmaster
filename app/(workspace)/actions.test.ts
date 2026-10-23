@@ -1,7 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
-const { accounts, tasks, refresh, redirect } = vi.hoisted(() => ({
+const { accounts, tasks, sharing, refresh, redirect } = vi.hoisted(() => ({
   accounts: { getCurrentUser: vi.fn() },
+  sharing: {
+    inviteToList: vi.fn(),
+    resendInvite: vi.fn(),
+    revokeInvite: vi.fn(),
+    removeMember: vi.fn(),
+    respondToInvitation: vi.fn(),
+    leaveList: vi.fn(),
+  },
   tasks: {
     createTask: vi.fn(),
     updateTask: vi.fn(),
@@ -18,6 +26,7 @@ const { accounts, tasks, refresh, redirect } = vi.hoisted(() => ({
 
 vi.mock("@/lib/accounts", () => accounts)
 vi.mock("@/lib/tasks", () => tasks)
+vi.mock("@/lib/sharing", () => sharing)
 vi.mock("next/cache", () => ({ refresh }))
 vi.mock("next/navigation", () => ({ redirect }))
 vi.mock("./today", () => ({ getToday: async () => "2026-10-21" }))
@@ -30,6 +39,12 @@ import {
   deleteListAction,
   deleteSubtaskAction,
   deleteTaskAction,
+  inviteToListAction,
+  leaveListAction,
+  removeMemberAction,
+  resendInviteAction,
+  respondToInvitationAction,
+  revokeInviteAction,
   updateSubtaskAction,
   updateTaskAction,
 } from "./actions"
@@ -39,7 +54,7 @@ const subtaskId = "44444444-4444-4444-8444-444444444444"
 
 beforeEach(() => {
   vi.clearAllMocks()
-  accounts.getCurrentUser.mockResolvedValue({ id: "user-1", name: "Ada" })
+  accounts.getCurrentUser.mockResolvedValue({ id: "user-1", name: "Ada", email: "ada@example.com" })
 })
 
 describe("createTaskAction", () => {
@@ -233,5 +248,73 @@ describe("deleteListAction", () => {
   it("rejects a malformed id", async () => {
     await expect(deleteListAction("nope", { leave: false })).resolves.toEqual({ error: "Invalid request" })
     expect(tasks.deleteList).not.toHaveBeenCalled()
+  })
+})
+
+describe("sharing actions", () => {
+  const listId = "22222222-2222-4222-8222-222222222222"
+  const inviteId = "55555555-5555-4555-8555-555555555555"
+
+  it("invites the addresses entered and refreshes the screen", async () => {
+    await expect(inviteToListAction(listId, { emails: "Mara@example.com, joost@example.com" })).resolves.toBeUndefined()
+
+    expect(sharing.inviteToList).toHaveBeenCalledWith("user-1", listId, ["mara@example.com", "joost@example.com"])
+    expect(refresh).toHaveBeenCalled()
+  })
+
+  it("re-validates the addresses on the server", async () => {
+    await expect(inviteToListAction(listId, { emails: "joost" })).resolves.toEqual({
+      error: "“joost” isn't a valid email address",
+    })
+    expect(sharing.inviteToList).not.toHaveBeenCalled()
+  })
+
+  it("passes on why nobody was invited", async () => {
+    sharing.inviteToList.mockResolvedValue({ error: "Everyone you entered already has access" })
+
+    await expect(inviteToListAction(listId, { emails: "ada@example.com" })).resolves.toEqual({
+      error: "Everyone you entered already has access",
+    })
+  })
+
+  it("resends and revokes invites", async () => {
+    await resendInviteAction(inviteId)
+    await revokeInviteAction(inviteId)
+
+    expect(sharing.resendInvite).toHaveBeenCalledWith("user-1", inviteId)
+    expect(sharing.revokeInvite).toHaveBeenCalledWith("user-1", inviteId)
+    expect(refresh).toHaveBeenCalledTimes(2)
+  })
+
+  it("removes a member", async () => {
+    await removeMemberAction(listId, "user-2")
+
+    expect(sharing.removeMember).toHaveBeenCalledWith("user-1", listId, "user-2")
+  })
+
+  it("answers an invitation as the signed-in user", async () => {
+    await respondToInvitationAction(inviteId, { accept: true })
+
+    expect(sharing.respondToInvitation).toHaveBeenCalledWith({ id: "user-1", email: "ada@example.com" }, inviteId, {
+      accept: true,
+    })
+    expect(refresh).toHaveBeenCalled()
+  })
+
+  it("leaves a shared list, moving to the inbox when the user was looking at it", async () => {
+    await leaveListAction(listId, { leave: true })
+
+    expect(sharing.leaveList).toHaveBeenCalledWith("user-1", listId)
+    expect(redirect).toHaveBeenCalledWith("/inbox")
+  })
+
+  it("rejects malformed ids", async () => {
+    await expect(inviteToListAction("nope", { emails: "mara@example.com" })).resolves.toEqual({ error: "Invalid request" })
+    await expect(resendInviteAction("nope")).resolves.toEqual({ error: "Invalid request" })
+    await expect(revokeInviteAction("nope")).resolves.toEqual({ error: "Invalid request" })
+    await expect(removeMemberAction(listId, "")).resolves.toEqual({ error: "Invalid request" })
+    await expect(respondToInvitationAction("nope", { accept: true })).resolves.toEqual({ error: "Invalid request" })
+    await expect(leaveListAction("nope", { leave: false })).resolves.toEqual({ error: "Invalid request" })
+    for (const action of Object.values(sharing)) expect(action).not.toHaveBeenCalled()
   })
 })

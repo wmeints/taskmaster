@@ -3,7 +3,9 @@
 import { refresh } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
-import { getCurrentUser } from "@/lib/accounts";
+import { getCurrentUser, type User } from "@/lib/accounts";
+import * as sharing from "@/lib/sharing";
+import { inviteSchema, type InviteValues } from "@/lib/sharing/schemas";
 import * as tasks from "@/lib/tasks";
 import {
   listSchema,
@@ -115,13 +117,72 @@ export async function deleteListAction(listId: string, { leave }: { leave: boole
   refresh();
 }
 
+// Invites one or more email addresses to a list the user owns.
+export async function inviteToListAction(listId: string, values: InviteValues): Promise<ActionResult> {
+  const userId = await requireUserId();
+  const parsed = inviteSchema.safeParse(values);
+  if (!id.safeParse(listId).success) return invalid();
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
+
+  const result = await sharing.inviteToList(userId, listId, parsed.data.emails);
+  refresh();
+  return result;
+}
+
+export async function resendInviteAction(inviteId: string): Promise<ActionResult> {
+  const userId = await requireUserId();
+  if (!id.safeParse(inviteId).success) return invalid();
+
+  await sharing.resendInvite(userId, inviteId);
+  refresh();
+}
+
+export async function revokeInviteAction(inviteId: string): Promise<ActionResult> {
+  const userId = await requireUserId();
+  if (!id.safeParse(inviteId).success) return invalid();
+
+  await sharing.revokeInvite(userId, inviteId);
+  refresh();
+}
+
+export async function removeMemberAction(listId: string, memberId: string): Promise<ActionResult> {
+  const userId = await requireUserId();
+  if (!id.safeParse(listId).success || !z.string().min(1).safeParse(memberId).success) return invalid();
+
+  await sharing.removeMember(userId, listId, memberId);
+  refresh();
+}
+
+export async function respondToInvitationAction(inviteId: string, answer: { accept: boolean }): Promise<ActionResult> {
+  const { id: userId, email } = await requireUser();
+  const parsed = z.object({ accept: z.boolean() }).safeParse(answer);
+  if (!id.safeParse(inviteId).success || !parsed.success) return invalid();
+
+  await sharing.respondToInvitation({ id: userId, email }, inviteId, parsed.data);
+  refresh();
+}
+
+// Leaves a list someone shared with the user. Pass leave when the user is looking at the list.
+export async function leaveListAction(listId: string, { leave }: { leave: boolean }): Promise<ActionResult> {
+  const userId = await requireUserId();
+  if (!id.safeParse(listId).success) return invalid();
+
+  await sharing.leaveList(userId, listId);
+  if (leave) redirect(hrefFor({ view: "inbox" }));
+  refresh();
+}
+
 // Server actions are reachable by direct POST, so each one checks the session itself.
-async function requireUserId(): Promise<string> {
+async function requireUser(): Promise<User> {
   const user = await getCurrentUser();
   if (!user) {
     throw new Error("Unauthorized");
   }
-  return user.id;
+  return user;
+}
+
+async function requireUserId(): Promise<string> {
+  return (await requireUser()).id;
 }
 
 function invalid() {

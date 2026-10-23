@@ -8,10 +8,19 @@ const home = { id: "1c2d3e4f-5a6b-4c7d-8e9f-0a1b2c3d4e5f", name: "Home renovatio
 const reading = { id: "9f8e7d6c-5b4a-4392-8170-6f5e4d3c2b1a", name: "Reading", color: "emerald" as const }
 
 export const lists: List[] = [
-  { ...website, openCount: 4 },
-  { ...home, openCount: 3 },
-  { ...reading, openCount: 1 },
+  { ...website, owned: true, openCount: 4 },
+  { ...home, owned: true, openCount: 3 },
+  { ...reading, owned: true, openCount: 1 },
 ]
+
+// A list someone else owns and shared with the user.
+export const sharedList: List = {
+  id: "4b3a2c1d-0e9f-4a8b-9c7d-6e5f4a3b2c1d",
+  name: "Team offsite",
+  color: "violet",
+  owned: false,
+  openCount: 2,
+}
 
 export const reviewTask: Task = {
   id: "0b6c3a52-6a8e-4f1b-9d2e-3c4b5a697801",

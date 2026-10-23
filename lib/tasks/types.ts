@@ -30,7 +30,8 @@ export type Task = {
   subtasks: Subtask[]
 }
 
-export type List = { id: string; name: string; color: ListColor; openCount: number }
+// owned is false for a list someone else shared with the user.
+export type List = { id: string; name: string; color: ListColor; owned: boolean; openCount: number }
 
 // What a workspace shows: one of the deadline views, or one of the user's lists.
 export type Scope = { view: View } | { listId: string }

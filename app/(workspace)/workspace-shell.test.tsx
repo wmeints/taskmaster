@@ -2,11 +2,22 @@ import { act, fireEvent, render, screen, waitFor, within } from "@testing-librar
 import userEvent from "@testing-library/user-event"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
-import { workspace } from "@/components/organisms/workspace.fixtures"
+import { sharedList, workspace } from "@/components/organisms/workspace.fixtures"
+import type { Sharing } from "@/lib/sharing/types"
 
 const { actions, navigation, router, signOut } = vi.hoisted(() => ({
   signOut: vi.fn(),
-  actions: { createListAction: vi.fn(), deleteListAction: vi.fn(), quickAddTaskAction: vi.fn() },
+  actions: {
+    createListAction: vi.fn(),
+    deleteListAction: vi.fn(),
+    quickAddTaskAction: vi.fn(),
+    inviteToListAction: vi.fn(),
+    resendInviteAction: vi.fn(),
+    revokeInviteAction: vi.fn(),
+    removeMemberAction: vi.fn(),
+    respondToInvitationAction: vi.fn(),
+    leaveListAction: vi.fn(),
+  },
   router: { push: vi.fn(), refresh: vi.fn(), replace: vi.fn(), prefetch: vi.fn() },
   navigation: { pathname: "/today" },
 }))
@@ -34,9 +45,11 @@ import { WorkspaceShell } from "./workspace-shell"
 
 const account = { name: "Ada Lovelace", email: "ada@example.com", createdAt: new Date("2026-10-01T09:30:00Z") }
 
-function renderShell() {
+const noSharing: Sharing = { invitations: [], lists: {} }
+
+function renderShell({ overview = workspace, sharing = noSharing } = {}) {
   return render(
-    <WorkspaceShell overview={workspace} today={workspace.today} account={account}>
+    <WorkspaceShell overview={overview} today={workspace.today} account={account} sharing={sharing}>
       <p>The view</p>
     </WorkspaceShell>,
   )
@@ -224,6 +237,77 @@ describe("WorkspaceShell", () => {
     await userEvent.click(await screen.findByRole("button", { name: "Delete list" }))
 
     await waitFor(() => expect(actions.deleteListAction).toHaveBeenCalledWith(list.id, { leave: true }))
+  })
+
+  describe("sharing", () => {
+    const [list] = workspace.lists
+    const sharing: Sharing = {
+      invitations: [{ id: "55555555-5555-4555-8555-555555555555", listName: "Garden", invitedBy: "Mara Kok" }],
+      lists: {
+        [list.id]: { members: [{ id: "user-2", name: "Mara Kok", email: "mara@example.com" }], invites: [] },
+      },
+    }
+
+    it("shares a list from its actions menu", async () => {
+      renderShell({ sharing })
+
+      await userEvent.click(screen.getByRole("button", { name: `Actions for ${list.name}` }))
+      await userEvent.click(await screen.findByRole("menuitem", { name: "Share list…" }))
+
+      const dialog = await screen.findByRole("dialog", { name: `Share “${list.name}”` })
+      expect(within(dialog).getByText("ada@example.com")).toBeInTheDocument()
+      expect(within(dialog).getByText("Mara Kok")).toBeInTheDocument()
+    })
+
+    it("opens the share dialog of the list on screen with ⇧S", async () => {
+      navigation.pathname = `/lists/${list.id}`
+      renderShell()
+
+      press("S", { shiftKey: true })
+
+      expect(await screen.findByRole("dialog", { name: `Share “${list.name}”` })).toBeInTheDocument()
+    })
+
+    it("ignores ⇧S outside the user's own lists", () => {
+      navigation.pathname = `/lists/${sharedList.id}`
+      renderShell({ overview: { ...workspace, lists: [...workspace.lists, sharedList] } })
+
+      press("S", { shiftKey: true })
+      navigation.pathname = "/today"
+      press("S", { shiftKey: true })
+
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument()
+    })
+
+    it("invites people to the list", async () => {
+      actions.inviteToListAction.mockResolvedValue(undefined)
+      navigation.pathname = `/lists/${list.id}`
+      renderShell()
+
+      press("S", { shiftKey: true })
+      await userEvent.type(await screen.findByRole("textbox", { name: "Invite by email" }), "joost@example.com{enter}")
+
+      expect(actions.inviteToListAction).toHaveBeenCalledWith(list.id, { emails: "joost@example.com" })
+    })
+
+    it("answers invitations from the sidebar", async () => {
+      renderShell({ sharing })
+
+      await userEvent.click(screen.getAllByRole("button", { name: "Accept the invite to Garden" })[0])
+
+      expect(actions.respondToInvitationAction).toHaveBeenCalledWith(sharing.invitations[0].id, { accept: true })
+    })
+
+    it("leaves a list shared with the user, going to the inbox when it is on screen", async () => {
+      navigation.pathname = `/lists/${sharedList.id}`
+      renderShell({ overview: { ...workspace, lists: [...workspace.lists, sharedList] } })
+
+      await userEvent.click(screen.getAllByRole("button", { name: `Actions for ${sharedList.name}` })[0])
+      await userEvent.click(await screen.findByRole("menuitem", { name: "Leave list…" }))
+      await userEvent.click(await screen.findByRole("button", { name: "Leave list" }))
+
+      await waitFor(() => expect(actions.leaveListAction).toHaveBeenCalledWith(sharedList.id, { leave: true }))
+    })
   })
 
   it("signs out from the account menu", async () => {

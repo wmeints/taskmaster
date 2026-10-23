@@ -7,9 +7,9 @@ import type { List } from "./types"
 const today = "2026-10-21"
 
 const lists: List[] = [
-  { id: "home", name: "Home renovation", color: "orange", openCount: 0 },
-  { id: "web", name: "Website relaunch", color: "blue", openCount: 0 },
-  { id: "read", name: "Reading", color: "emerald", openCount: 0 },
+  { id: "home", name: "Home renovation", color: "orange", owned: true, openCount: 0 },
+  { id: "web", name: "Website relaunch", color: "blue", owned: true, openCount: 0 },
+  { id: "read", name: "Reading", color: "emerald", owned: true, openCount: 0 },
 ]
 
 const parse = (text: string) => parseQuickAdd(text, { lists, today })

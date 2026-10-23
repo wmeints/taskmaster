@@ -17,13 +17,34 @@ describe("useShortcuts", () => {
     expect(complete).toHaveBeenCalledOnce()
   })
 
-  it("matches letters regardless of case", () => {
+  it("matches letters regardless of caps lock", () => {
     const complete = vi.fn()
     renderHook(() => useShortcuts({ x: complete }))
 
-    press("X", { shiftKey: true })
+    press("X")
 
     expect(complete).toHaveBeenCalledOnce()
+  })
+
+  it("binds shifted letters apart from the plain letter, even from another component", () => {
+    const addSubtask = vi.fn()
+    const share = vi.fn()
+    renderHook(() => useShortcuts({ s: addSubtask }))
+    renderHook(() => useShortcuts({ "shift+s": share }))
+
+    press("S", { shiftKey: true })
+
+    expect(share).toHaveBeenCalledOnce()
+    expect(addSubtask).not.toHaveBeenCalled()
+  })
+
+  it("leaves shifted symbols to their own key", () => {
+    const help = vi.fn()
+    renderHook(() => useShortcuts({ "?": help }))
+
+    press("?", { shiftKey: true })
+
+    expect(help).toHaveBeenCalledOnce()
   })
 
   it("prevents the browser default for handled keys", () => {
