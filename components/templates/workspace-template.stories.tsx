@@ -1,7 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite"
 import { expect } from "storybook/test"
 
-import { TaskDetailEmpty } from "@/components/molecules/task-detail-empty"
 import { AppSidebar } from "@/components/organisms/app-sidebar"
 import { ShortcutBar } from "@/components/organisms/shortcut-bar"
 import { ViewSkeleton } from "@/components/organisms/view-skeleton"
@@ -49,7 +48,7 @@ export const LoadingView: Story = {
       />
     ),
     children: (
-      <ViewTemplate busy footer={<ShortcutBar />} emptyDetail={<TaskDetailEmpty />}>
+      <ViewTemplate busy footer={<ShortcutBar />}>
         <ViewSkeleton heading={{ title: "Tomorrow", subtitle: "Thursday 22 October" }} />
       </ViewTemplate>
     ),
@@ -58,6 +57,5 @@ export const LoadingView: Story = {
     await expect(canvas.getByRole("link", { name: /Tomorrow/ })).toHaveAttribute("aria-busy", "true")
     await expect(canvas.getByRole("heading", { level: 1, name: "Tomorrow" })).toBeInTheDocument()
     await expect(canvas.getByRole("progressbar", { name: "Loading" })).toBeInTheDocument()
-    await expect(canvas.getByText("Select a task to see its details")).toBeInTheDocument()
   },
 }

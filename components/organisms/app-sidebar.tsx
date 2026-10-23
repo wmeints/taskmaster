@@ -15,6 +15,7 @@ import {
 import { ListDot } from "@/components/atoms/list-dot"
 import { AccountMenu } from "@/components/molecules/account-menu"
 import { AddListForm } from "@/components/molecules/add-list-form"
+import { ListActionsMenu } from "@/components/molecules/list-actions-menu"
 import { Logo } from "@/components/molecules/logo"
 import { SearchTrigger } from "@/components/molecules/search-trigger"
 import { SidebarNavItem } from "@/components/molecules/sidebar-nav-item"
@@ -43,6 +44,7 @@ function AppSidebar({
   onSearch,
   onShowShortcuts,
   onCreateList,
+  onDeleteList,
   onNavigate,
 }: {
   counts: Record<View, number>
@@ -56,6 +58,8 @@ function AppSidebar({
   onSearch: () => void
   onShowShortcuts: () => void
   onCreateList: (values: ListValues) => Promise<{ id: string } | { error: string }>
+  // Deletes a list after the user confirmed it; the lists get no actions menu without it.
+  onDeleteList?: (listId: string) => Promise<{ error: string } | void>
   // Takes over navigation to a view or list.
   onNavigate?: (href: string) => void
 }) {
@@ -124,6 +128,9 @@ function AppSidebar({
               label={list.name}
               count={list.openCount}
               leading={<ListDot color={list.color} />}
+              action={
+                onDeleteList && <ListActionsMenu listName={list.name} onDelete={() => onDeleteList(list.id)} />
+              }
             />
           ))}
         </ul>

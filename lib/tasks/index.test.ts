@@ -9,6 +9,7 @@ import {
   addSubtask,
   createList,
   createTask,
+  deleteList,
   deleteSubtask,
   deleteTask,
   getOverview,
@@ -286,5 +287,18 @@ describe("createList", () => {
     expect(params[0]).toBe(userId)
     expect(params[1]).toBe("Reading")
     expect(params[2]).toEqual(expect.arrayContaining(["blue", "orange", "emerald"]))
+  })
+})
+
+describe("deleteList", () => {
+  it("deletes the user's list and keeps its tasks", async () => {
+    await deleteList(userId, homeId)
+
+    expect(pool.query).toHaveBeenCalledTimes(1)
+    const [sql, params] = pool.query.mock.calls[0]
+    expect(sql).toContain("delete from lists")
+    expect(sql).toContain("user_id = $1")
+    expect(sql).not.toContain("tasks")
+    expect(params).toEqual([userId, homeId])
   })
 })

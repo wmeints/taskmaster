@@ -72,7 +72,7 @@ describe("WorkspaceScreen", () => {
     expect(screen.getByText("Wednesday 21 October")).toBeInTheDocument()
     expect(screen.getByRole("button", { name: review.title })).toBeInTheDocument()
     expect(detail()).not.toBeInTheDocument()
-    expect(screen.getByText("Select a task to see its details")).toBeInTheDocument()
+    expect(screen.queryByText("Select a task to see its details")).not.toBeInTheDocument()
   })
 
   it("opens a task given in the URL", () => {

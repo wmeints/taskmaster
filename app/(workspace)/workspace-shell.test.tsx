@@ -6,7 +6,7 @@ import { workspace } from "@/components/organisms/workspace.fixtures"
 
 const { actions, navigation, router, signOut } = vi.hoisted(() => ({
   signOut: vi.fn(),
-  actions: { createListAction: vi.fn() },
+  actions: { createListAction: vi.fn(), deleteListAction: vi.fn() },
   router: { push: vi.fn(), refresh: vi.fn(), replace: vi.fn(), prefetch: vi.fn() },
   navigation: { pathname: "/today" },
 }))
@@ -168,6 +168,31 @@ describe("WorkspaceShell", () => {
 
     expect(actions.createListAction).toHaveBeenCalledWith({ name: "Garden" })
     await waitFor(() => expect(router.push).toHaveBeenCalledWith("/lists/new-list"))
+  })
+
+  it("deletes a list once the user confirms", async () => {
+    const [list, other] = workspace.lists
+    navigation.pathname = `/lists/${other.id}`
+    renderShell()
+
+    await userEvent.click(screen.getByRole("button", { name: `Actions for ${list.name}` }))
+    await userEvent.click(await screen.findByRole("menuitem", { name: "Delete list…" }))
+    expect(actions.deleteListAction).not.toHaveBeenCalled()
+    await userEvent.click(await screen.findByRole("button", { name: "Delete list" }))
+
+    await waitFor(() => expect(actions.deleteListAction).toHaveBeenCalledWith(list.id, { leave: false }))
+  })
+
+  it("leaves the list being viewed when deleting it", async () => {
+    const [list] = workspace.lists
+    navigation.pathname = `/lists/${list.id}`
+    renderShell()
+
+    await userEvent.click(screen.getByRole("button", { name: `Actions for ${list.name}` }))
+    await userEvent.click(await screen.findByRole("menuitem", { name: "Delete list…" }))
+    await userEvent.click(await screen.findByRole("button", { name: "Delete list" }))
+
+    await waitFor(() => expect(actions.deleteListAction).toHaveBeenCalledWith(list.id, { leave: true }))
   })
 
   it("signs out from the account menu", async () => {

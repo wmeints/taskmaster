@@ -1,7 +1,6 @@
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { connection } from "next/server";
-import { TaskDetailEmpty } from "@/components/molecules/task-detail-empty";
 import { ShortcutBar } from "@/components/organisms/shortcut-bar";
 import { ViewSkeleton } from "@/components/organisms/view-skeleton";
 import { ViewTemplate } from "@/components/templates/view-template";
@@ -19,7 +18,7 @@ export default function WorkspaceLayout({ children }: { children: React.ReactNod
     <Suspense
       fallback={
         <WorkspaceTemplate sidebar={null}>
-          <ViewTemplate busy footer={<ShortcutBar />} emptyDetail={<TaskDetailEmpty />}>
+          <ViewTemplate busy footer={<ShortcutBar />}>
             <ViewSkeleton heading={null} />
           </ViewTemplate>
         </WorkspaceTemplate>

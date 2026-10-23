@@ -1,18 +1,16 @@
 import { LoadingBar } from "@/components/atoms/loading-bar"
 
-// One view or list: its content with a shortcut bar under it, and a details panel on the right.
+// One view or list: its content with a shortcut bar under it, and a details panel on the right while a
+// task is open.
 function ViewTemplate({
   footer,
   detail,
-  emptyDetail,
   busy = false,
   children,
 }: {
   footer: React.ReactNode
   // The open task; covers the whole screen on small screens.
   detail?: React.ReactNode
-  // Fills the panel on wide screens while no task is open.
-  emptyDetail?: React.ReactNode
   // The view is loading.
   busy?: boolean
   children: React.ReactNode
@@ -33,9 +31,6 @@ function ViewTemplate({
         >
           {detail}
         </aside>
-      )}
-      {!detail && emptyDetail && (
-        <div className="hidden w-90 shrink-0 overflow-y-auto border-l lg:flex">{emptyDetail}</div>
       )}
     </>
   )

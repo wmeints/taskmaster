@@ -3,7 +3,6 @@
 import { createContext, useContext, useEffect, useOptimistic, useRef, useState, useTransition } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { signOut } from "@/app/auth/actions";
-import { TaskDetailEmpty } from "@/components/molecules/task-detail-empty";
 import { AppSidebar } from "@/components/organisms/app-sidebar";
 import { CommandMenu } from "@/components/organisms/command-menu";
 import { ShortcutBar } from "@/components/organisms/shortcut-bar";
@@ -16,7 +15,7 @@ import { timeZoneCookie } from "@/lib/tasks/deadlines";
 import { headingFor } from "@/lib/tasks/headings";
 import { hrefFor, scopeFor } from "@/lib/tasks/routes";
 import { viewTitles, type Overview, type Scope, type View } from "@/lib/tasks/types";
-import { createListAction } from "./actions";
+import { createListAction, deleteListAction } from "./actions";
 
 // Sidebar numbers predicted by the open view while a change is on its way to the server.
 type Prediction = Pick<Overview, "counts" | "lists">;
@@ -55,6 +54,7 @@ export function WorkspaceShell({
 
   const { counts, lists } = prediction ?? overview;
   const loading = navigating ? destination : null;
+  const current = scopeFor(pathname);
 
   useTimeZoneCookie(router.refresh);
 
@@ -79,7 +79,7 @@ export function WorkspaceShell({
           <AppSidebar
             counts={counts}
             lists={lists}
-            scope={loading ?? scopeFor(pathname)}
+            scope={loading ?? current}
             pending={loading !== null}
             account={account}
             signOutAction={signOut}
@@ -91,11 +91,14 @@ export function WorkspaceShell({
               if ("id" in result) navigate(hrefFor({ listId: result.id }));
               return result;
             }}
+            onDeleteList={(listId) =>
+              deleteListAction(listId, { leave: current !== null && "listId" in current && current.listId === listId })
+            }
           />
         }
       >
         {loading ? (
-          <ViewTemplate busy footer={<ShortcutBar />} emptyDetail={<TaskDetailEmpty />}>
+          <ViewTemplate busy footer={<ShortcutBar />}>
             <ViewSkeleton heading={headingFor(loading, { lists, today })} />
           </ViewTemplate>
         ) : (

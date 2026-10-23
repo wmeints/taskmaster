@@ -2,7 +2,6 @@
 
 import { useEffect, useOptimistic, useRef, useState, useTransition } from "react";
 import { InlineAddForm } from "@/components/molecules/inline-add-form";
-import { TaskDetailEmpty } from "@/components/molecules/task-detail-empty";
 import { ViewHeader } from "@/components/molecules/view-header";
 import { ShortcutBar } from "@/components/organisms/shortcut-bar";
 import { TaskDetail } from "@/components/organisms/task-detail";
@@ -133,7 +132,6 @@ export function WorkspaceScreen({
   return (
     <ViewTemplate
       footer={<ShortcutBar />}
-      emptyDetail={<TaskDetailEmpty />}
       detail={
         open && (
           <TaskDetail

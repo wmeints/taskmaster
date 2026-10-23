@@ -1,6 +1,7 @@
 "use server";
 
 import { refresh } from "next/cache";
+import { redirect } from "next/navigation";
 import { z } from "zod";
 import { getCurrentUser } from "@/lib/accounts";
 import * as tasks from "@/lib/tasks";
@@ -15,6 +16,7 @@ import {
   type SubtaskValues,
   type TaskChanges,
 } from "@/lib/tasks/schemas";
+import { hrefFor } from "@/lib/tasks/routes";
 import type { Scope } from "@/lib/tasks/types";
 import { getToday } from "./today";
 
@@ -87,6 +89,17 @@ export async function createListAction(values: ListValues): Promise<{ id: string
   const listId = await tasks.createList(userId, parsed.data.name);
   refresh();
   return { id: listId };
+}
+
+// Deletes a list, keeping its tasks. Pass leave when the user is looking at the list, so they land in the
+// inbox instead of on a list that no longer exists.
+export async function deleteListAction(listId: string, { leave }: { leave: boolean }): Promise<ActionResult> {
+  const userId = await requireUserId();
+  if (!id.safeParse(listId).success) return invalid();
+
+  await tasks.deleteList(userId, listId);
+  if (leave) redirect(hrefFor({ view: "inbox" }));
+  refresh();
 }
 
 // Server actions are reachable by direct POST, so each one checks the session itself.

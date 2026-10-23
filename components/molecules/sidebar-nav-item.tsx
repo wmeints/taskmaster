@@ -13,6 +13,7 @@ function SidebarNavItem({
   active = false,
   pending = false,
   onNavigate,
+  action,
 }: {
   href: string
   label: string
@@ -24,9 +25,11 @@ function SidebarNavItem({
   pending?: boolean
   // Takes over client-side navigation, e.g. to show a loading state. Opening in a new tab still works.
   onNavigate?: () => void
+  // A control next to the link, such as a menu; shown in place of the count on hover or focus.
+  action?: React.ReactNode
 }) {
   return (
-    <li>
+    <li className="group/nav-item relative">
       <Link
         href={href}
         aria-current={active ? "page" : undefined}
@@ -49,9 +52,23 @@ function SidebarNavItem({
         {pending ? (
           <Spinner className="size-3.5! text-primary!" />
         ) : (
-          count > 0 && <span className="text-xs text-muted-foreground tabular-nums">{count}</span>
+          count > 0 && (
+            <span
+              className={cn(
+                "text-xs text-muted-foreground tabular-nums",
+                action && "group-focus-within/nav-item:invisible group-hover/nav-item:invisible"
+              )}
+            >
+              {count}
+            </span>
+          )
         )}
       </Link>
+      {action && !pending && (
+        <div className="absolute inset-y-0 right-1.5 flex items-center opacity-0 group-focus-within/nav-item:opacity-100 group-hover/nav-item:opacity-100 has-aria-expanded:opacity-100">
+          {action}
+        </div>
+      )}
     </li>
   )
 }

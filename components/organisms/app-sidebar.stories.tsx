@@ -83,3 +83,14 @@ export const Pending: Story = {
     await expect(canvas.getByRole("link", { name: /Today/ })).not.toHaveAttribute("aria-busy")
   },
 }
+
+export const DeletesList: Story = {
+  args: { onDeleteList: fn(async () => undefined) },
+  play: async ({ args, canvas, userEvent }) => {
+    await userEvent.click(canvas.getByRole("button", { name: `Actions for ${lists[1].name}` }))
+    await userEvent.click(await screen.findByRole("menuitem", { name: "Delete list…" }))
+    await userEvent.click(await screen.findByRole("button", { name: "Delete list" }))
+
+    await expect(args.onDeleteList).toHaveBeenCalledWith(lists[1].id)
+  },
+}

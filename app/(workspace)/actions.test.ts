@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
-const { accounts, tasks, refresh } = vi.hoisted(() => ({
+const { accounts, tasks, refresh, redirect } = vi.hoisted(() => ({
   accounts: { getCurrentUser: vi.fn() },
   tasks: {
     createTask: vi.fn(),
@@ -10,19 +10,23 @@ const { accounts, tasks, refresh } = vi.hoisted(() => ({
     updateSubtask: vi.fn(),
     deleteSubtask: vi.fn(),
     createList: vi.fn(),
+    deleteList: vi.fn(),
   },
   refresh: vi.fn(),
+  redirect: vi.fn(),
 }))
 
 vi.mock("@/lib/accounts", () => accounts)
 vi.mock("@/lib/tasks", () => tasks)
 vi.mock("next/cache", () => ({ refresh }))
+vi.mock("next/navigation", () => ({ redirect }))
 vi.mock("./today", () => ({ getToday: async () => "2026-10-21" }))
 
 import {
   addSubtaskAction,
   createListAction,
   createTaskAction,
+  deleteListAction,
   deleteSubtaskAction,
   deleteTaskAction,
   updateSubtaskAction,
@@ -125,5 +129,29 @@ describe("createListAction", () => {
 
   it("requires a name", async () => {
     await expect(createListAction({ name: "" })).resolves.toEqual({ error: "Enter a list name" })
+  })
+})
+
+describe("deleteListAction", () => {
+  const listId = "22222222-2222-4222-8222-222222222222"
+
+  it("deletes the list and refreshes the screen", async () => {
+    await expect(deleteListAction(listId, { leave: false })).resolves.toBeUndefined()
+
+    expect(tasks.deleteList).toHaveBeenCalledWith("user-1", listId)
+    expect(refresh).toHaveBeenCalled()
+    expect(redirect).not.toHaveBeenCalled()
+  })
+
+  it("moves to the inbox when the user was looking at the list", async () => {
+    await deleteListAction(listId, { leave: true })
+
+    expect(tasks.deleteList).toHaveBeenCalledWith("user-1", listId)
+    expect(redirect).toHaveBeenCalledWith("/inbox")
+  })
+
+  it("rejects a malformed id", async () => {
+    await expect(deleteListAction("nope", { leave: false })).resolves.toEqual({ error: "Invalid request" })
+    expect(tasks.deleteList).not.toHaveBeenCalled()
   })
 })

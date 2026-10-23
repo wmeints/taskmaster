@@ -151,6 +151,11 @@ export async function createList(userId: string, name: string): Promise<string> 
   return rows[0].id;
 }
 
+// Deletes the user's list. Its tasks stay, without a list (the foreign key sets list_id to null).
+export async function deleteList(userId: string, listId: string): Promise<void> {
+  await pool.query("delete from lists where id = $2 and user_id = $1", [userId, listId]);
+}
+
 async function findLists(userId: string): Promise<ListRow[]> {
   const { rows } = await pool.query<ListRow>(
     "select id, name, color from lists where user_id = $1 order by created_at",

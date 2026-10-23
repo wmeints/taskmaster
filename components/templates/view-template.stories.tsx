@@ -43,15 +43,6 @@ export const WithoutDetail: Story = {
   },
 }
 
-// No task open: wide screens keep the panel's space with a hint, so opening a task doesn't move the view.
-export const EmptyDetail: Story = {
-  args: { detail: undefined, emptyDetail: <div>Nothing open</div> },
-  play: async ({ canvas }) => {
-    await expect(canvas.queryByRole("complementary", { name: "Task details" })).not.toBeInTheDocument()
-    await expect(canvas.getByText("Nothing open")).toBeInTheDocument()
-  },
-}
-
 export const Busy: Story = {
   args: { busy: true, detail: undefined },
   play: async ({ canvas }) => {

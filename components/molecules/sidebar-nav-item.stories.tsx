@@ -60,3 +60,19 @@ export const Pending: Story = {
     await expect(link).not.toHaveTextContent("3")
   },
 }
+
+// An action next to the link, shown on hover or focus in place of the count.
+export const WithAction: Story = {
+  args: {
+    href: "/lists/1",
+    label: "Reading",
+    count: 1,
+    leading: <ListDot color="emerald" />,
+    action: <button type="button">Actions for Reading</button>,
+  },
+  play: async ({ canvas }) => {
+    const action = canvas.getByRole("button", { name: "Actions for Reading" })
+    // Outside the link, so it can be clicked without navigating.
+    await expect(canvas.getByRole("link", { name: /Reading/ })).not.toContainElement(action)
+  },
+}
