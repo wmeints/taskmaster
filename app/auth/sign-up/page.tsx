@@ -1,0 +1,6 @@
+import { signUpWithEmail } from "../actions";
+import { AuthForm } from "../auth-form";
+
+export default function SignUpPage() {
+  return <AuthForm mode="sign-up" action={signUpWithEmail} />;
+}
