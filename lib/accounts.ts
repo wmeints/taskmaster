@@ -1,6 +1,6 @@
 import "server-only";
 import { auth } from "@/lib/auth/server";
-import { pool } from "@/lib/db";
+import { findUserCreatedAt } from "@/lib/db/queries";
 
 export type Account = {
   id: string;
@@ -30,14 +30,5 @@ export async function getCurrentAccount(): Promise<Account | null> {
   }
 
   const { id, name, email } = session.user;
-  return { id, name, email, createdAt: await findCreatedAt(id) };
-}
-
-// Managed Auth stores users in the branch's neon_auth schema, so the same Postgres can read them.
-async function findCreatedAt(userId: string): Promise<Date | null> {
-  const { rows } = await pool.query<{ created_at: Date }>(
-    'select "createdAt" as created_at from neon_auth."user" where id = $1',
-    [userId],
-  );
-  return rows[0]?.created_at ?? null;
+  return { id, name, email, createdAt: await findUserCreatedAt(id) };
 }

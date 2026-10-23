@@ -1,10 +1,12 @@
+import { eq } from "drizzle-orm"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
-const { pool } = vi.hoisted(() => ({ pool: { query: vi.fn() } }))
-
 vi.mock("server-only", () => ({}))
-vi.mock("@/lib/db", () => ({ pool }))
+vi.mock("@/lib/db", () => import("@/lib/db/testing"))
 
+import { db, resetDatabase } from "@/lib/db/testing"
+import { listInvites, listMembers, lists } from "@/lib/db/schema"
+import { users } from "@/lib/db/schema/users"
 import {
   getSharing,
   inviteToList,
@@ -15,149 +17,214 @@ import {
   revokeInvite,
 } from "./index"
 
-const user = { id: "user-1", email: "Ada@Example.com" }
-const websiteId = "11111111-1111-4111-8111-111111111111"
-const homeId = "22222222-2222-4222-8222-222222222222"
-const inviteId = "33333333-3333-4333-8333-333333333333"
+// Signs in with mixed case; invitations are stored and matched in lower case.
+const ada = { id: "6a0c1c3e-1111-4111-8111-111111111111", name: "Ada Lovelace", email: "Ada@Example.com" }
+const mara = { id: "6a0c1c3e-2222-4222-8222-222222222222", name: "Mara Kok", email: "mara@example.com" }
 
-beforeEach(() => {
-  vi.clearAllMocks()
-  pool.query.mockResolvedValue({ rows: [] })
+async function givenUsers() {
+  await db.insert(users).values([ada, mara])
+}
+
+async function givenList(name: string, owner = ada.id) {
+  const [{ id }] = await db.insert(lists).values({ userId: owner, name, color: "blue" }).returning({ id: lists.id })
+  return id
+}
+
+async function givenInvite(listId: string, email: string, { invitedBy = ada.id, declined = false } = {}) {
+  const [{ id }] = await db
+    .insert(listInvites)
+    .values({ listId, email, invitedBy, declinedAt: declined ? new Date() : null })
+    .returning({ id: listInvites.id })
+  return id
+}
+
+async function givenMember(listId: string, userId: string) {
+  await db.insert(listMembers).values({ listId, userId })
+}
+
+const invitesTo = (listId: string) =>
+  db
+    .select({ email: listInvites.email, declinedAt: listInvites.declinedAt, sentAt: listInvites.sentAt })
+    .from(listInvites)
+    .where(eq(listInvites.listId, listId))
+
+const membersOf = async (listId: string) =>
+  (await db.select({ userId: listMembers.userId }).from(listMembers).where(eq(listMembers.listId, listId))).map(
+    (member) => member.userId,
+  )
+
+beforeEach(async () => {
+  await resetDatabase()
+  await givenUsers()
 })
 
 describe("getSharing", () => {
-  // Answers the three reads: members of the user's lists, invites they sent and invitations they received.
-  function givenData({ members = [], invites = [], invitations = [] }: Record<string, unknown[]>) {
-    pool.query.mockImplementation(async (sql: string) => ({
-      rows: sql.includes("from list_members") ? members : sql.includes("i.declined_at is null") ? invitations : invites,
-    }))
-  }
-
   it("groups the people with access by the user's lists", async () => {
-    givenData({
-      members: [{ list_id: websiteId, id: "user-2", name: "Mara Kok", email: "mara@example.com" }],
-      invites: [
-        { list_id: websiteId, id: inviteId, email: "joost@example.com", declined: false },
-        { list_id: homeId, id: "invite-2", email: "lies@example.com", declined: true },
-      ],
-    })
+    const websiteId = await givenList("Website relaunch")
+    const homeId = await givenList("Home renovation")
+    await givenMember(websiteId, mara.id)
+    const joostId = await givenInvite(websiteId, "joost@example.com")
+    const liesId = await givenInvite(homeId, "lies@example.com", { declined: true })
 
-    const sharing = await getSharing(user)
+    const sharing = await getSharing(ada)
 
     expect(sharing.lists).toEqual({
       [websiteId]: {
-        members: [{ id: "user-2", name: "Mara Kok", email: "mara@example.com" }],
-        invites: [{ id: inviteId, email: "joost@example.com", declined: false }],
+        members: [{ id: mara.id, name: "Mara Kok", email: "mara@example.com" }],
+        invites: [{ id: joostId, email: "joost@example.com", declined: false }],
       },
-      [homeId]: { members: [], invites: [{ id: "invite-2", email: "lies@example.com", declined: true }] },
+      [homeId]: { members: [], invites: [{ id: liesId, email: "lies@example.com", declined: true }] },
     })
   })
 
-  it("lists the invitations waiting for the user's reply, matched by email", async () => {
-    givenData({ invitations: [{ id: inviteId, list_name: "Website relaunch", invited_by: "Mara Kok" }] })
+  it("only shows who has access to lists the user owns", async () => {
+    const marasId = await givenList("Mara's list", mara.id)
+    await givenMember(marasId, ada.id)
+    await givenInvite(marasId, "joost@example.com", { invitedBy: mara.id })
 
-    const sharing = await getSharing(user)
-
-    expect(sharing.invitations).toEqual([{ id: inviteId, listName: "Website relaunch", invitedBy: "Mara Kok" }])
-    const [, params] = pool.query.mock.calls.find(([sql]) => sql.includes("i.declined_at is null"))!
-    expect(params).toEqual(["ada@example.com"])
+    expect((await getSharing(ada)).lists).toEqual({})
   })
 
-  it("only reads who has access to lists the user owns", async () => {
-    givenData({})
+  it("lists the invitations waiting for the user's reply, matched by email", async () => {
+    const marasId = await givenList("Website relaunch", mara.id)
+    const inviteId = await givenInvite(marasId, "ada@example.com", { invitedBy: mara.id })
+    const declinedListId = await givenList("Declined", mara.id)
+    await givenInvite(declinedListId, "ada@example.com", { invitedBy: mara.id, declined: true })
+    await givenInvite(await givenList("Not for Ada", mara.id), "joost@example.com", { invitedBy: mara.id })
 
-    await getSharing(user)
+    const sharing = await getSharing(ada)
 
-    for (const [sql, params] of pool.query.mock.calls.filter(([sql]) => !sql.includes("i.declined_at is null"))) {
-      expect(sql).toContain("l.user_id = $1")
-      expect(params).toEqual([user.id])
-    }
+    expect(sharing.invitations).toEqual([{ id: inviteId, listName: "Website relaunch", invitedBy: "Mara Kok" }])
   })
 })
 
 describe("inviteToList", () => {
   it("invites the addresses to a list the user owns", async () => {
-    pool.query.mockResolvedValue({ rows: [{ invited: 2 }] })
+    const websiteId = await givenList("Website relaunch")
 
-    await expect(inviteToList(user.id, websiteId, ["mara@example.com", "joost@example.com"])).resolves.toBeUndefined()
+    await expect(inviteToList(ada.id, websiteId, ["joost@example.com", "lies@example.com"])).resolves.toBeUndefined()
 
-    const [sql, params] = pool.query.mock.calls[0]
-    expect(sql).toContain("insert into list_invites")
-    expect(sql).toContain("l.user_id = $1")
-    expect(params).toEqual([user.id, websiteId, ["mara@example.com", "joost@example.com"]])
+    expect((await invitesTo(websiteId)).map((invite) => invite.email).sort()).toEqual([
+      "joost@example.com",
+      "lies@example.com",
+    ])
   })
 
   it("sends an earlier invite again instead of adding a second one", async () => {
-    pool.query.mockResolvedValue({ rows: [{ invited: 1 }] })
+    const websiteId = await givenList("Website relaunch")
+    await givenInvite(websiteId, "joost@example.com", { declined: true })
+    const [before] = await invitesTo(websiteId)
 
-    await inviteToList(user.id, websiteId, ["joost@example.com"])
+    await inviteToList(ada.id, websiteId, ["joost@example.com"])
 
-    expect(pool.query.mock.calls[0][0]).toMatch(/on conflict \(list_id, email\) do update set sent_at = now\(\), declined_at = null/)
+    const after = await invitesTo(websiteId)
+    expect(after).toHaveLength(1)
+    expect(after[0].declinedAt).toBeNull()
+    expect(after[0].sentAt.getTime()).toBeGreaterThan(before.sentAt.getTime())
   })
 
-  it("says so when everyone already has access", async () => {
-    pool.query.mockResolvedValue({ rows: [{ invited: 0 }] })
+  it("skips the owner and the people who already joined, and says so when that's everyone", async () => {
+    const websiteId = await givenList("Website relaunch")
+    await givenMember(websiteId, mara.id)
 
-    await expect(inviteToList(user.id, websiteId, ["ada@example.com"])).resolves.toEqual({
+    await expect(inviteToList(ada.id, websiteId, ["ada@example.com", "mara@example.com"])).resolves.toEqual({
       error: "Everyone you entered already has access",
     })
-    expect(pool.query.mock.calls[0][0]).toContain("list_members")
+    expect(await invitesTo(websiteId)).toEqual([])
+  })
+
+  it("does not invite anyone to a list the user doesn't own", async () => {
+    const marasId = await givenList("Mara's list", mara.id)
+
+    await expect(inviteToList(ada.id, marasId, ["joost@example.com"])).resolves.toEqual({
+      error: "Everyone you entered already has access",
+    })
+    expect(await invitesTo(marasId)).toEqual([])
   })
 })
 
 describe("managing access", () => {
-  it("sends an invite to one of the user's lists again", async () => {
-    await resendInvite(user.id, inviteId)
+  it("sends an invite to one of the user's lists again, also when it was declined", async () => {
+    const websiteId = await givenList("Website relaunch")
+    const inviteId = await givenInvite(websiteId, "joost@example.com", { declined: true })
 
-    const [sql, params] = pool.query.mock.calls[0]
-    expect(sql).toMatch(/update list_invites set sent_at = now\(\), declined_at = null/)
-    expect(sql).toContain("select id from lists where user_id = $1")
-    expect(params).toEqual([user.id, inviteId])
+    await resendInvite(ada.id, inviteId)
+
+    expect((await invitesTo(websiteId))[0].declinedAt).toBeNull()
   })
 
   it("revokes an invite to one of the user's lists", async () => {
-    await revokeInvite(user.id, inviteId)
+    const websiteId = await givenList("Website relaunch")
+    const inviteId = await givenInvite(websiteId, "joost@example.com")
 
-    const [sql, params] = pool.query.mock.calls[0]
-    expect(sql).toContain("delete from list_invites")
-    expect(sql).toContain("select id from lists where user_id = $1")
-    expect(params).toEqual([user.id, inviteId])
+    await revokeInvite(ada.id, inviteId)
+
+    expect(await invitesTo(websiteId)).toEqual([])
   })
 
   it("removes a member from one of the user's lists", async () => {
-    await removeMember(user.id, websiteId, "user-2")
+    const websiteId = await givenList("Website relaunch")
+    await givenMember(websiteId, mara.id)
 
-    const [sql, params] = pool.query.mock.calls[0]
-    expect(sql).toContain("delete from list_members")
-    expect(sql).toContain("select id from lists where user_id = $1")
-    expect(params).toEqual([user.id, websiteId, "user-2"])
+    await removeMember(ada.id, websiteId, mara.id)
+
+    expect(await membersOf(websiteId)).toEqual([])
+  })
+
+  it("leaves invites and members of other people's lists alone", async () => {
+    const marasId = await givenList("Mara's list", mara.id)
+    await givenMember(marasId, ada.id)
+    const inviteId = await givenInvite(marasId, "joost@example.com", { invitedBy: mara.id, declined: true })
+
+    await resendInvite(ada.id, inviteId)
+    await removeMember(ada.id, marasId, ada.id)
+    await revokeInvite(ada.id, inviteId)
+
+    expect(await invitesTo(marasId)).toEqual([expect.objectContaining({ declinedAt: expect.any(Date) })])
+    expect(await membersOf(marasId)).toEqual([ada.id])
   })
 })
 
 describe("respondToInvitation", () => {
-  it("joins the list and uses up the invitation in one statement", async () => {
-    await respondToInvitation(user, inviteId, { accept: true })
+  it("joins the list and uses up the invitation", async () => {
+    const marasId = await givenList("Mara's list", mara.id)
+    const inviteId = await givenInvite(marasId, "ada@example.com", { invitedBy: mara.id })
 
-    expect(pool.query).toHaveBeenCalledOnce()
-    const [sql, params] = pool.query.mock.calls[0]
-    expect(sql).toContain("delete from list_invites")
-    expect(sql).toContain("insert into list_members")
-    expect(params).toEqual([user.id, inviteId, "ada@example.com"])
+    await respondToInvitation(ada, inviteId, { accept: true })
+
+    expect(await membersOf(marasId)).toEqual([ada.id])
+    expect(await invitesTo(marasId)).toEqual([])
   })
 
   it("declines, so the owner sees the reply", async () => {
-    await respondToInvitation(user, inviteId, { accept: false })
+    const marasId = await givenList("Mara's list", mara.id)
+    const inviteId = await givenInvite(marasId, "ada@example.com", { invitedBy: mara.id })
 
-    const [sql, params] = pool.query.mock.calls[0]
-    expect(sql).toMatch(/update list_invites set declined_at = now\(\)/)
-    expect(params).toEqual([inviteId, "ada@example.com"])
+    await respondToInvitation(ada, inviteId, { accept: false })
+
+    expect(await membersOf(marasId)).toEqual([])
+    expect(await invitesTo(marasId)).toEqual([expect.objectContaining({ declinedAt: expect.any(Date) })])
+  })
+
+  it("ignores invitations sent to someone else", async () => {
+    const marasId = await givenList("Mara's list", mara.id)
+    const inviteId = await givenInvite(marasId, "joost@example.com", { invitedBy: mara.id })
+
+    await respondToInvitation(ada, inviteId, { accept: true })
+    await respondToInvitation(ada, inviteId, { accept: false })
+
+    expect(await membersOf(marasId)).toEqual([])
+    expect(await invitesTo(marasId)).toEqual([expect.objectContaining({ declinedAt: null })])
   })
 })
 
 describe("leaveList", () => {
   it("gives up the user's access to a shared list", async () => {
-    await leaveList(user.id, websiteId)
+    const marasId = await givenList("Mara's list", mara.id)
+    await givenMember(marasId, ada.id)
 
-    expect(pool.query).toHaveBeenCalledWith(expect.stringContaining("delete from list_members"), [user.id, websiteId])
+    await leaveList(ada.id, marasId)
+
+    expect(await membersOf(marasId)).toEqual([])
   })
 })

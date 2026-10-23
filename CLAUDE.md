@@ -25,6 +25,30 @@ Design logic modules (everything under `lib/` and other non-UI code) as deep mod
 - Prefer fewer, more powerful functions over many shallow pass-through functions or thin wrappers.
 - Callers should not need to understand the module's internals or call functions in a particular order to use it correctly.
 
+## Database: Drizzle ORM on Neon
+
+The app talks to Neon Postgres through [Drizzle ORM](https://orm.drizzle.team) over `node-postgres` (`pg`), using the pooled `DATABASE_URL` with `attachDatabasePool` for Vercel Fluid compute. Do not add another driver or ORM, and do not write raw `pool.query` calls.
+
+- **Layout**
+  - `lib/db/index.ts` — the `db` client. Only `lib/db/queries/` imports it.
+  - `lib/db/schema/` — **one file per table** (`lists.ts`, `tasks.ts`, `subtasks.ts`, `list-members.ts`, `list-invites.ts`), each holding the table and its `relations()`. `schema/index.ts` re-exports every table the app migrates.
+  - `lib/db/schema/users.ts` — Neon Auth's `neon_auth."user"` table, read-only. Neon Auth owns and migrates it, so keep it **out of** `schema/index.ts` (otherwise Drizzle Kit generates migrations for it) and import it from `@/lib/db/schema/users` where a query joins on users.
+  - `lib/db/queries/` — **the only place queries live**. One file per area (`tasks.ts`, `sharing.ts`, `accounts.ts`), all exported through `queries/index.ts`. `access.ts` holds the shared access rules ("lists the user owns or was given", "tasks the user can see") and stays private to the module.
+  - Domain modules (`lib/tasks`, `lib/sharing`, `lib/accounts`) and routes call the queries module, never `db` or the schema directly. A domain module may re-export a query under its domain name (`export { insertList as createList } from "@/lib/db/queries"`) instead of wrapping it in a pass-through function.
+- **Schema**
+  - Spell out every column name in snake_case (`userId: text("user_id")`) and every constraint and index name, matching Postgres's own naming (`tasks_list_id_fkey`, `list_members_pkey`, `lists_user_id_idx`). Declare foreign keys with `foreignKey({ name, ... })` in the table's extra config rather than `.references()`, which invents names that differ from the existing database.
+  - Use `timestamp(..., { withTimezone: true })`, `date(..., { mode: "string" })` for calendar dates, and `.$type<...>()` to narrow text columns to the domain's union types.
+  - User ids are stored as `text`; Neon Auth keys users by `uuid`, so join with `` sql`${users.id}::text` ``.
+- **Queries**
+  - Build queries with the query builder (`db.select`, `insert`, `update`, `delete`) or the relational API (`db.query.<table>.findMany` with `with:` for nested rows). Fall back to `` sql`...` `` only for expressions Drizzle has no operator for, and always interpolate values so they become parameters; never build SQL with string concatenation.
+  - Filter every read and write done on a user's behalf with the access rules in `access.ts`, so a user can never touch rows they have no access to.
+  - Select only the columns the caller needs, and let return types be inferred from the query (`Awaited<ReturnType<typeof findTasks>>`) instead of hand-writing row types.
+  - Wrap statements that must succeed or fail together in `db.transaction`.
+- **Migrations**
+  - Change a schema file, then run `pnpm db:generate` (`drizzle-kit generate`) to write a migration into `db/migrations/`, and commit the SQL and the `meta/` snapshot together. Read the generated SQL before committing it. Never edit a migration that has already been applied.
+  - Apply migrations with `pnpm db:migrate` (`lib/db/migrate.mts`), which uses the direct `DATABASE_URL_UNPOOLED` connection. Test migrations on a Neon branch before applying them to the default branch. Do not use `drizzle-kit push` against shared branches.
+- **Testing** — unit-test queries and domain modules against a real in-memory Postgres, not mocked SQL strings: mock the client with `vi.mock("@/lib/db", () => import("@/lib/db/testing"))`, call `resetDatabase()` in `beforeEach`, seed rows through `db` from `@/lib/db/testing`, and assert on the results through the module's public interface.
+
 # Development workflow
 
 ## Red-green-refactor

@@ -13,7 +13,7 @@ vi.mock("@/lib/env", () => ({ env }))
 async function connectionStringFor(databaseUrl: string) {
   env.postgres.databaseUrl = databaseUrl
   vi.resetModules()
-  await import("./db")
+  await import("./index")
   return new URL(Pool.mock.calls[0][0].connectionString)
 }
 

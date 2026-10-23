@@ -1,34 +1,24 @@
 import "server-only";
 import { cache } from "react";
 import { z } from "zod";
-import { pool } from "@/lib/db";
+import { findLists, findTasks, insertTask } from "@/lib/db/queries";
 import { dateForPreset, viewOf, type Due, type View } from "./deadlines";
-import type { TaskChanges } from "./schemas";
-import { listColors, viewTitles, type ListColor, type Overview, type Scope, type Subtask, type Task, type Workspace } from "./types";
+import { viewTitles, type Scope, type Task, type Workspace, type Overview } from "./types";
 
 export type { List, Overview, Scope, Task, Workspace } from "./types";
 
-// Completed tasks stay visible in their view for this long.
-const completedRetention = "7 days";
+export {
+  deleteList,
+  deleteSubtask,
+  deleteTask,
+  insertList as createList,
+  insertSubtask as addSubtask,
+  updateSubtask,
+  updateTask,
+} from "@/lib/db/queries";
 
-// The lists the user in $1 owns or was given access to, and the tasks they can see and change: their own
-// and every task in those lists.
-const ownedOrShared = "user_id = $1 or id in (select list_id from list_members where user_id = $1)";
-const accessibleTasks = `select id from tasks where user_id = $1 or list_id in (select id from lists where ${ownedOrShared})`;
-const accessibleTask = `(user_id = $1 or list_id in (select id from lists where ${ownedOrShared}))`;
-
-type ListRow = { id: string; name: string; color: ListColor; owned: boolean };
-
-type TaskRow = {
-  id: string;
-  title: string;
-  description: string;
-  due_date: string | null;
-  due_time: string | null;
-  list_id: string | null;
-  completed: boolean;
-  subtasks: Subtask[];
-};
+type ListRow = Awaited<ReturnType<typeof findLists>>[number];
+type TaskRow = Awaited<ReturnType<typeof findTasks>>[number];
 
 // What the sidebar and search show for the user, whichever view or list is open.
 export async function getOverview(userId: string, today: string): Promise<Overview> {
@@ -106,128 +96,19 @@ export async function createTask(
   } else {
     ({ due, listId } = task);
   }
-  // The new list goes in with the task, so a failed insert leaves no empty list behind.
-  const { rows } = await pool.query<{ id: string }>(
-    newList
-      ? `with new_list as (${insertList("$4", "$6")})
-         insert into tasks (user_id, title, due_date, list_id, due_time)
-         values ($1, $2, $3, (select id from new_list), $5)
-         returning id`
-      : `insert into tasks (user_id, title, due_date, list_id, due_time)
-         values ($1, $2, $3, (select id from lists where id = $4 and (${ownedOrShared})), $5)
-         returning id`,
-    [userId, title, due?.date ?? null, newList ?? listId, due?.time ?? null, ...(newList ? [[...listColors]] : [])],
-  );
-  return rows[0].id;
-}
-
-export async function updateTask(userId: string, taskId: string, changes: TaskChanges): Promise<void> {
-  const params: unknown[] = [userId, taskId];
-  const param = (value: unknown) => `$${params.push(value)}`;
-  const assignments: string[] = [];
-
-  if (changes.title !== undefined) assignments.push(`title = ${param(changes.title)}`);
-  if (changes.description !== undefined) assignments.push(`description = ${param(changes.description)}`);
-  if (changes.due !== undefined) {
-    assignments.push(`due_date = ${param(changes.due?.date ?? null)}`, `due_time = ${param(changes.due?.time ?? null)}`);
-  }
-  if (changes.listId !== undefined) {
-    // A list id the user can't access resolves to no list rather than leaking into someone else's.
-    assignments.push(`list_id = (select id from lists where id = ${param(changes.listId)} and (${ownedOrShared}))`);
-  }
-  if (changes.completed !== undefined) {
-    assignments.push(`completed_at = case when ${param(changes.completed)} then coalesce(completed_at, now()) end`);
-  }
-
-  if (assignments.length === 0) {
-    return;
-  }
-  await pool.query(`update tasks set ${assignments.join(", ")} where id = $2 and ${accessibleTask}`, params);
-}
-
-export async function deleteTask(userId: string, taskId: string): Promise<void> {
-  await pool.query(`delete from tasks where id = $2 and ${accessibleTask}`, [userId, taskId]);
-}
-
-export async function addSubtask(userId: string, taskId: string, title: string): Promise<void> {
-  await pool.query(
-    `insert into subtasks (task_id, title) select id, $3 from tasks where id = $2 and ${accessibleTask}`,
-    [userId, taskId, title],
-  );
-}
-
-export async function updateSubtask(userId: string, subtaskId: string, { done }: { done: boolean }): Promise<void> {
-  await pool.query(
-    `update subtasks set done = $3
-     where id = $2 and task_id in (${accessibleTasks})`,
-    [userId, subtaskId, done],
-  );
-}
-
-export async function deleteSubtask(userId: string, subtaskId: string): Promise<void> {
-  await pool.query(
-    `delete from subtasks where id = $2 and task_id in (${accessibleTasks})`,
-    [userId, subtaskId],
-  );
-}
-
-// Creates a list with the next color in the palette. Returns the new list's id.
-export async function createList(userId: string, name: string): Promise<string> {
-  const { rows } = await pool.query<{ id: string }>(insertList("$2", "$3"), [userId, name, [...listColors]]);
-  return rows[0].id;
-}
-
-// Inserts a list for the user in $1, giving it the next of the colors in the given parameter.
-function insertList(name: string, colors: string): string {
-  return `insert into lists (user_id, name, color)
-     values ($1, ${name}::text, (${colors}::text[])[(select count(*) from lists where user_id = $1) % array_length(${colors}::text[], 1) + 1])
-     returning id`;
-}
-
-// Deletes a list the user owns. Its tasks stay, without a list (the foreign key sets list_id to null).
-export async function deleteList(userId: string, listId: string): Promise<void> {
-  await pool.query("delete from lists where id = $2 and user_id = $1", [userId, listId]);
-}
-
-async function findLists(userId: string): Promise<ListRow[]> {
-  const { rows } = await pool.query<ListRow>(
-    `select id, name, color, user_id = $1 as owned from lists where ${ownedOrShared} order by created_at`,
-    [userId],
-  );
-  return rows;
-}
-
-// Open tasks plus recently completed ones, earliest deadline first: the user's own and those in lists shared
-// with them.
-async function findTasks(userId: string): Promise<TaskRow[]> {
-  const { rows } = await pool.query<TaskRow>(
-    `select t.id, t.title, t.description, t.due_date::text as due_date,
-            to_char(t.due_time, 'HH24:MI') as due_time, t.list_id, t.completed_at is not null as completed,
-            coalesce(
-              json_agg(json_build_object('id', s.id, 'title', s.title, 'done', s.done) order by s.created_at)
-                filter (where s.id is not null),
-              '[]'
-            ) as subtasks
-     from tasks t
-     left join subtasks s on s.task_id = t.id
-     where (t.user_id = $1 or t.list_id in (select id from lists where ${ownedOrShared}))
-       and (t.completed_at is null or t.completed_at > now() - interval '${completedRetention}')
-     group by t.id
-     order by t.completed_at desc nulls first, t.due_date nulls last, t.due_time nulls last, t.created_at`,
-    [userId],
-  );
-  return rows;
+  return insertTask(userId, { title, due, listId, newList });
 }
 
 function toTask(row: TaskRow, listsById: Map<string, ListRow>): Task {
-  const list = row.list_id ? listsById.get(row.list_id) : undefined;
+  const list = row.listId ? listsById.get(row.listId) : undefined;
   return {
     id: row.id,
     title: row.title,
     description: row.description,
-    due: row.due_date ? { date: row.due_date, time: row.due_time } : null,
+    // Postgres gives times as HH:MM:SS; tasks only keep hours and minutes.
+    due: row.dueDate ? { date: row.dueDate, time: row.dueTime?.slice(0, 5) ?? null } : null,
     list: list ? { id: list.id, name: list.name, color: list.color } : null,
-    completed: row.completed,
+    completed: row.completedAt !== null,
     subtasks: row.subtasks,
   };
 }

@@ -1,20 +1,22 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
-const { auth, pool } = vi.hoisted(() => ({
+const { auth } = vi.hoisted(() => ({
   auth: { getSession: vi.fn() },
-  pool: { query: vi.fn() },
 }))
 
 vi.mock("server-only", () => ({}))
 vi.mock("@/lib/auth/server", () => ({ auth }))
-vi.mock("@/lib/db", () => ({ pool }))
+vi.mock("@/lib/db", () => import("@/lib/db/testing"))
 
+import { db, resetDatabase } from "@/lib/db/testing"
+import { users } from "@/lib/db/schema/users"
 import { getCurrentAccount, getCurrentUser } from "./accounts"
 
-const user = { id: "user-1", name: "Ada", email: "ada@example.com" }
+const user = { id: "6a0c1c3e-1111-4111-8111-111111111111", name: "Ada", email: "ada@example.com" }
 
-beforeEach(() => {
+beforeEach(async () => {
   vi.clearAllMocks()
+  await resetDatabase()
 })
 
 describe("getCurrentAccount", () => {
@@ -22,26 +24,18 @@ describe("getCurrentAccount", () => {
     auth.getSession.mockResolvedValue({ data: null })
 
     await expect(getCurrentAccount()).resolves.toBeNull()
-    expect(pool.query).not.toHaveBeenCalled()
   })
 
   it("returns the signed-in user with the creation date from Postgres", async () => {
     const createdAt = new Date("2026-10-01T09:30:00Z")
+    await db.insert(users).values({ ...user, createdAt })
     auth.getSession.mockResolvedValue({ data: { user } })
-    pool.query.mockResolvedValue({ rows: [{ created_at: createdAt }] })
 
-    await expect(getCurrentAccount()).resolves.toEqual({
-      id: "user-1",
-      name: "Ada",
-      email: "ada@example.com",
-      createdAt,
-    })
-    expect(pool.query).toHaveBeenCalledWith(expect.any(String), ["user-1"])
+    await expect(getCurrentAccount()).resolves.toEqual({ ...user, createdAt })
   })
 
   it("leaves the creation date empty when the user row is missing", async () => {
     auth.getSession.mockResolvedValue({ data: { user } })
-    pool.query.mockResolvedValue({ rows: [] })
 
     await expect(getCurrentAccount()).resolves.toMatchObject({ createdAt: null })
   })
@@ -54,10 +48,9 @@ describe("getCurrentUser", () => {
     await expect(getCurrentUser()).resolves.toBeNull()
   })
 
-  it("returns the signed-in user's id, name and email without querying Postgres", async () => {
+  it("returns the signed-in user's id, name and email", async () => {
     auth.getSession.mockResolvedValue({ data: { user } })
 
-    await expect(getCurrentUser()).resolves.toEqual({ id: "user-1", name: "Ada", email: "ada@example.com" })
-    expect(pool.query).not.toHaveBeenCalled()
+    await expect(getCurrentUser()).resolves.toEqual(user)
   })
 })
