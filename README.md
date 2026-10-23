@@ -71,7 +71,8 @@ variables must be set where the build runs.
 | ---------------- | ---------------------------------------------------------------------------------- |
 | `pnpm test:unit` | Vitest unit tests (`*.test.ts`) against an in-memory Postgres (PGlite) — no Neon needed |
 | `pnpm test:ui`   | Storybook interaction tests in a headless Chromium browser                         |
-| `pnpm test`      | Both of the above                                                                  |
+| `pnpm test:e2e`  | Cucumber end-to-end tests with Playwright against a Neon test branch (see below)   |
+| `pnpm test`      | Unit and UI tests                                                                  |
 | `pnpm lint`      | ESLint                                                                             |
 
 The UI tests need a Playwright browser. Install it once with:
@@ -81,6 +82,23 @@ pnpm exec playwright install chromium
 ```
 
 To work on components in isolation, run `pnpm storybook` and open [http://localhost:6006](http://localhost:6006).
+
+### End-to-end tests
+
+`pnpm test:e2e` runs the Cucumber feature files in `e2e/features/` with Playwright, against a production build
+served on port 3100. They cover the happy flows only; alternative flows and failure modes live in the unit and UI
+tests.
+
+The tests sign up real users, so they need a Neon branch of their own:
+
+1. Create a branch with Neon Auth enabled, for example `neon branches create --name e2e` followed by
+   `neon deploy --branch e2e --no-env-pull`.
+2. Write its settings to `.env.e2e` with `neon env pull --branch e2e --file .env.e2e`, then add a
+   `NEON_AUTH_COOKIE_SECRET` line.
+
+Before starting the app, the tests apply the migrations to that branch. They refuse to run when `.env.e2e` is
+missing or points at the same branch, database or auth server as `.env.local`. To see failures step by step, open
+the report with `pnpm exec playwright show-report`.
 
 ## Changing the database schema
 
