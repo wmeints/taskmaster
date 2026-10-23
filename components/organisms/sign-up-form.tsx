@@ -31,6 +31,7 @@ function SignUpForm({
 
   return (
     <form
+      method="post"
       noValidate
       onSubmit={form.handleSubmit(onSubmit)}
       className="flex w-full max-w-sm flex-col gap-6"

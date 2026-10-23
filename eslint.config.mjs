@@ -18,6 +18,19 @@ const eslintConfig = defineConfig([
     "test-results/**",
   ]),
   {
+    rules: {
+      "no-restricted-syntax": [
+        "error",
+        {
+          // A form submitted before the page hydrates falls back to its method. With GET, the browser puts
+          // every field, passwords included, in the URL, where history and server logs keep it.
+          selector: "JSXOpeningElement[name.name='form']:not(:has(JSXAttribute[name.name='method'][value.value='post']))",
+          message: 'Give every <form> method="post", so fields never end up in the URL.',
+        },
+      ],
+    },
+  },
+  {
     // Playwright fixtures call use(), which the React rules mistake for the React hook.
     files: ["e2e/**"],
     rules: { "react-hooks/rules-of-hooks": "off" },

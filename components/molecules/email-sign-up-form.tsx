@@ -38,7 +38,7 @@ function EmailSignUpForm({
   }
 
   return (
-    <form noValidate onSubmit={form.handleSubmit(onSubmit)} className={className}>
+    <form method="post" noValidate onSubmit={form.handleSubmit(onSubmit)} className={className}>
       <Controller
         control={form.control}
         name="email"

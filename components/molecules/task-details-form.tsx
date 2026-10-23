@@ -44,7 +44,7 @@ function TaskDetailsForm({
   }
 
   return (
-    <form noValidate onSubmit={form.handleSubmit(onSubmit)}>
+    <form method="post" noValidate onSubmit={form.handleSubmit(onSubmit)}>
       <FieldGroup className="gap-5">
         <Controller
           control={form.control}

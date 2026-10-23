@@ -15,7 +15,7 @@ function ExampleForm({ onSubmit }: { onSubmit: (values: z.infer<typeof schema>) 
   const form = useForm({ resolver: zodResolver(schema), defaultValues: { email: "" } })
 
   return (
-    <form noValidate onSubmit={form.handleSubmit(onSubmit)}>
+    <form method="post" noValidate onSubmit={form.handleSubmit(onSubmit)}>
       <FormTextField control={form.control} name="email" label="Email" type="email" />
       <button type="submit">Submit</button>
     </form>

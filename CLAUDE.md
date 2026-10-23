@@ -73,6 +73,7 @@ Build every form in the application with [React Hook Form](https://react-hook-fo
 - **Shared validation** — put schemas used by both the client and a server action in `lib/` (e.g. `lib/auth/schemas.ts`) so the server re-validates the same input with `schema.safeParse(...)`. Never trust client-side validation alone.
 - **Wire up with the resolver** — `useForm({ resolver: zodResolver(schema), defaultValues })` from `@hookform/resolvers/zod`. Always provide `defaultValues` for every field.
 - **Compose with shadcn `Field` atoms** — render each input through react-hook-form's `Controller` and the primitives in `components/ui/field.tsx` (`FieldGroup`, `Field`, `FieldLabel`, `FieldDescription`, `FieldError`). Set `data-invalid={fieldState.invalid}` on `Field` and `aria-invalid={fieldState.invalid}` on the control. Do not hand-roll error markup.
+- **Never GET** — give every `<form>` `method="post"`. A form submitted before the page hydrates falls back to its method, and with GET the browser puts every field, passwords included, in the URL. ESLint enforces this.
 - **Submitting** — handle submission in `form.handleSubmit(onSubmit)`; call server actions from `onSubmit` with the parsed, typed values. Use `formState.isSubmitting` for pending UI, and surface server errors with `form.setError` (use `"root"` for errors that are not tied to a field).
 - **Testing** — cover validation rules with Vitest tests against the schema, and cover the form's behavior (error messages shown, submit called with valid values) with Storybook interaction tests.
 

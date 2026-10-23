@@ -30,7 +30,7 @@ function InviteForm({ onInvite }: { onInvite: (values: InviteValues) => Promise<
   }
 
   return (
-    <form noValidate onSubmit={form.handleSubmit(onSubmit)}>
+    <form method="post" noValidate onSubmit={form.handleSubmit(onSubmit)}>
       <Controller
         control={form.control}
         name="emails"

@@ -27,7 +27,7 @@ function AddListForm({
   }
 
   return (
-    <form noValidate onSubmit={form.handleSubmit(onSubmit)} className="px-1">
+    <form method="post" noValidate onSubmit={form.handleSubmit(onSubmit)} className="px-1">
       <Controller
         control={form.control}
         name="name"

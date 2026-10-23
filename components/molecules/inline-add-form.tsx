@@ -47,7 +47,7 @@ function InlineAddForm({
   }
 
   return (
-    <form noValidate onSubmit={form.handleSubmit(onSubmit)}>
+    <form method="post" noValidate onSubmit={form.handleSubmit(onSubmit)}>
       <Controller
         control={form.control}
         name="title"
