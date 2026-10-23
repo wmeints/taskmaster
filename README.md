@@ -1,36 +1,92 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Taskmaster
 
-## Getting Started
+A task-list app built with Next.js 16, React 19, Tailwind CSS 4 and shadcn/ui. Data lives in
+[Neon](https://neon.tech) Postgres, accessed through [Drizzle ORM](https://orm.drizzle.team), and users sign in
+with Neon Auth.
 
-First, run the development server:
+## Prerequisites
+
+- **Node.js 20** or newer
+- **pnpm** — the version is pinned in `package.json` (`packageManager`); run `corepack enable` and Corepack
+  picks it up for you
+- **A Neon project** with Neon Auth enabled. Use a dedicated branch for development rather than the default
+  (production) branch.
+
+## Setup
+
+1. Install dependencies:
+
+   ```bash
+   pnpm install
+   ```
+
+2. Create a Neon branch for development. With the Neon CLI, `neon checkout <name>` creates one using the
+   branch policy in `neon.ts` (non-default branches expire after 7 days).
+
+3. Create `.env.local` in the project root with the values for that branch, taken from the Neon Console
+   (**Connect** for the connection strings, **Auth** for the Neon Auth settings):
+
+   ```bash
+   # Pooled connection, used by the app
+   DATABASE_URL=postgresql://...-pooler.../neondb?sslmode=require
+   # Direct connection, used by migrations
+   DATABASE_URL_UNPOOLED=postgresql://.../neondb?sslmode=require
+
+   NEON_AUTH_BASE_URL=https://...
+   # Any long random string, e.g. `openssl rand -base64 32`
+   NEON_AUTH_COOKIE_SECRET=...
+   ```
+
+   `.env*` files are git-ignored; never commit them.
+
+4. Apply the database migrations:
+
+   ```bash
+   pnpm db:migrate
+   ```
+
+## Running in development
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
 pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000). The page reloads as you edit files.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+To browse the database, run `pnpm db:studio` to open Drizzle Studio.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Building for production
 
-## Learn More
+```bash
+pnpm build
+pnpm start
+```
 
-To learn more about Next.js, take a look at the following resources:
+`pnpm build` creates an optimized build in `.next/`; `pnpm start` serves it on port 3000. The same environment
+variables must be set where the build runs.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Testing
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+| Command          | What it runs                                                                       |
+| ---------------- | ---------------------------------------------------------------------------------- |
+| `pnpm test:unit` | Vitest unit tests (`*.test.ts`) against an in-memory Postgres (PGlite) — no Neon needed |
+| `pnpm test:ui`   | Storybook interaction tests in a headless Chromium browser                         |
+| `pnpm test`      | Both of the above                                                                  |
+| `pnpm lint`      | ESLint                                                                             |
 
-## Deploy on Vercel
+The UI tests need a Playwright browser. Install it once with:
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+```bash
+pnpm exec playwright install chromium
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+To work on components in isolation, run `pnpm storybook` and open [http://localhost:6006](http://localhost:6006).
+
+## Changing the database schema
+
+1. Edit the table's file in `lib/db/schema/`.
+2. Run `pnpm db:generate` to write a migration into `db/migrations/`, and read the generated SQL.
+3. Run `pnpm db:migrate` against your development branch to try it out.
+4. Commit the SQL file together with the updated `db/migrations/meta/` snapshot.
+
+See `CLAUDE.md` for the project's architecture and coding guidelines.
