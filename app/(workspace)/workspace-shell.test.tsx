@@ -414,4 +414,19 @@ describe("WorkspaceShell", () => {
     expect(document.cookie).toContain(`tz=${Intl.DateTimeFormat().resolvedOptions().timeZone}`)
     expect(router.refresh).toHaveBeenCalled()
   })
+
+  it("refreshes when the user comes back, so changes to shared lists show up", () => {
+    vi.useFakeTimers({ toFake: ["Date"] })
+    try {
+      renderShell()
+      router.refresh.mockClear()
+
+      vi.setSystemTime(Date.now() + 60_000)
+      fireEvent.focus(window)
+
+      expect(router.refresh).toHaveBeenCalledOnce()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
 })

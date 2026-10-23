@@ -17,6 +17,7 @@ import { ViewSkeleton } from "@/components/organisms/view-skeleton";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { ViewTemplate } from "@/components/templates/view-template";
 import { WorkspaceTemplate } from "@/components/templates/workspace-template";
+import { useLiveRefresh } from "@/hooks/use-live-refresh";
 import { useShortcuts } from "@/hooks/use-shortcuts";
 import type { Sharing } from "@/lib/sharing/types";
 import { timeZoneCookie } from "@/lib/tasks/deadlines";
@@ -85,6 +86,7 @@ export function WorkspaceShell({
   const sharedList = lists.find((list) => list.id === shareListId && list.owned);
 
   useTimeZoneCookie(router.refresh);
+  useLiveRefresh(router.refresh);
   useSearchRequest(() => setSearchOpen(true), router.replace);
 
   // Navigates in a transition, so the shell knows when the next view has arrived.
