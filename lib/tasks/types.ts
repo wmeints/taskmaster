@@ -39,8 +39,8 @@ export type Scope = { view: View } | { listId: string }
 export type Overview = {
   counts: Record<View, number>
   lists: List[]
-  // Every open task, so search can jump to tasks outside the current view.
-  searchable: { id: string; title: string; view: View }[]
+  // Every open and recently completed task, so search can jump to tasks outside the current view.
+  searchable: { id: string; title: string; view: View; completed: boolean }[]
 }
 
 export type Workspace = Overview & {

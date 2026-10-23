@@ -26,6 +26,7 @@ import {
   addSubtaskAction,
   createListAction,
   createTaskAction,
+  quickAddTaskAction,
   deleteListAction,
   deleteSubtaskAction,
   deleteTaskAction,
@@ -68,6 +69,38 @@ describe("createTaskAction", () => {
     accounts.getCurrentUser.mockResolvedValue(null)
 
     await expect(createTaskAction({ view: "today" }, { title: "Buy paint" })).rejects.toThrow("Unauthorized")
+    expect(tasks.createTask).not.toHaveBeenCalled()
+  })
+})
+
+describe("quickAddTaskAction", () => {
+  const homeId = "22222222-2222-4222-8222-222222222222"
+
+  it("creates the task with the recognised deadline and list", async () => {
+    tasks.createTask.mockResolvedValue(taskId)
+
+    const result = await quickAddTaskAction({
+      title: " Call the dentist ",
+      due: { date: "2026-10-22", time: null },
+      listId: homeId,
+    })
+
+    expect(result).toEqual({ id: taskId })
+    expect(tasks.createTask).toHaveBeenCalledWith("user-1", {
+      title: "Call the dentist",
+      due: { date: "2026-10-22", time: null },
+      listId: homeId,
+    })
+    expect(refresh).toHaveBeenCalled()
+  })
+
+  it("rejects invalid input", async () => {
+    await expect(quickAddTaskAction({ title: "", due: null, listId: null })).resolves.toEqual({
+      error: "Enter a task",
+    })
+    await expect(
+      quickAddTaskAction({ title: "Buy paint", due: { date: "friday", time: null }, listId: null }),
+    ).resolves.toEqual({ error: expect.any(String) })
     expect(tasks.createTask).not.toHaveBeenCalled()
   })
 })

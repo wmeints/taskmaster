@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 
-import { listSchema, newTaskSchema, scopeSchema, subtaskSchema, taskChangesSchema, taskDetailsSchema } from "./schemas"
+import { listSchema, newTaskSchema, quickAddSchema, scopeSchema, subtaskSchema, taskChangesSchema, taskDetailsSchema } from "./schemas"
 
 function messages(result: { success: boolean; error?: { issues: { message: string }[] } }) {
   return result.error?.issues.map((issue) => issue.message) ?? []
@@ -83,5 +83,21 @@ describe("scopeSchema", () => {
   it("rejects unknown views and malformed list ids", () => {
     expect(scopeSchema.safeParse({ view: "someday" }).success).toBe(false)
     expect(scopeSchema.safeParse({ listId: "nope" }).success).toBe(false)
+  })
+})
+
+describe("quickAddSchema", () => {
+  it("takes a title with an optional deadline and list", () => {
+    expect(
+      quickAddSchema.parse({ title: " Call the dentist ", due: { date: "2026-10-22", time: "15:00" }, listId: null }),
+    ).toEqual({ title: "Call the dentist", due: { date: "2026-10-22", time: "15:00" }, listId: null })
+  })
+
+  it("requires a title and valid ids and dates", () => {
+    expect(messages(quickAddSchema.safeParse({ title: " ", due: null, listId: null }))).toEqual(["Enter a task"])
+    expect(quickAddSchema.safeParse({ title: "Buy paint", due: null, listId: "home" }).success).toBe(false)
+    expect(quickAddSchema.safeParse({ title: "Buy paint", due: { date: "fri", time: null }, listId: null }).success).toBe(
+      false,
+    )
   })
 })

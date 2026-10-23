@@ -129,15 +129,18 @@ describe("getWorkspace", () => {
     expect(pool.query).not.toHaveBeenCalled()
   })
 
-  it("lists the open tasks of every view for search", async () => {
+  it("lists the open and recently completed tasks of every view for search", async () => {
     givenData([
       taskRow({ id: taskId, title: "Buy paint", due_date: "2026-10-22" }),
-      taskRow({ title: "Done already", completed: true }),
+      taskRow({ id: subtaskId, title: "Done already", completed: true }),
     ])
 
     const workspace = await getWorkspace(userId, { view: "inbox" }, today)
 
-    expect(workspace?.searchable).toEqual([{ id: taskId, title: "Buy paint", view: "tomorrow" }])
+    expect(workspace?.searchable).toEqual([
+      { id: taskId, title: "Buy paint", view: "tomorrow", completed: false },
+      { id: subtaskId, title: "Done already", view: "inbox", completed: true },
+    ])
   })
 
   it("includes subtasks", async () => {
@@ -165,7 +168,10 @@ describe("getOverview", () => {
         { id: websiteId, name: "Website relaunch", color: "blue", openCount: 0 },
         { id: homeId, name: "Home renovation", color: "orange", openCount: 1 },
       ],
-      searchable: [{ id: taskId, title: "Buy paint", view: "tomorrow" }],
+      searchable: [
+        { id: taskId, title: "Buy paint", view: "tomorrow", completed: false },
+        expect.objectContaining({ title: "Done already", completed: true }),
+      ],
     })
   })
 })
@@ -183,19 +189,28 @@ describe("createTask", () => {
       "Buy paint",
       "2026-10-22",
       null,
+      null,
     ])
   })
 
   it("leaves tasks added to the inbox without a deadline", async () => {
     await createTask(userId, { title: "Buy paint", scope: { view: "inbox" }, today })
 
-    expect(pool.query.mock.calls[0][1]).toEqual([userId, "Buy paint", null, null])
+    expect(pool.query.mock.calls[0][1]).toEqual([userId, "Buy paint", null, null, null])
+  })
+
+  it("can take an explicit deadline and list instead", async () => {
+    await createTask(userId, { title: "Call the dentist", due: { date: "2026-10-23", time: "15:00" }, listId: homeId })
+
+    const [sql, params] = pool.query.mock.calls[0]
+    expect(sql).toContain("due_time")
+    expect(params).toEqual([userId, "Call the dentist", "2026-10-23", homeId, "15:00"])
   })
 
   it("puts a task added to a list in that list", async () => {
     await createTask(userId, { title: "Buy paint", scope: { listId: homeId }, today })
 
-    expect(pool.query.mock.calls[0][1]).toEqual([userId, "Buy paint", null, homeId])
+    expect(pool.query.mock.calls[0][1]).toEqual([userId, "Buy paint", null, homeId, null])
   })
 })
 

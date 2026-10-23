@@ -51,3 +51,19 @@ export const SelectsWithEnter: Story = {
     await expect(onSelectInbox).toHaveBeenCalled()
   },
 }
+
+// The palette's input: larger, with a hint at the end.
+export const LargeInput: Story = {
+  render: (args) => (
+    <Command {...args} className="w-[36rem] border">
+      <CommandInput size="lg" placeholder="Search…" trailing={<span>Esc</span>} />
+      <CommandList>
+        <CommandItem>Inbox</CommandItem>
+      </CommandList>
+    </Command>
+  ),
+  play: async ({ canvas }) => {
+    await expect(canvas.getByRole("combobox", { name: "Search" })).toHaveClass("text-base")
+    await expect(canvas.getByText("Esc")).toBeInTheDocument()
+  },
+}

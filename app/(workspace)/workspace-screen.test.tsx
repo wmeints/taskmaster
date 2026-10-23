@@ -13,6 +13,7 @@ const { actions, router } = vi.hoisted(() => ({
     updateSubtaskAction: vi.fn(),
     deleteSubtaskAction: vi.fn(),
     createListAction: vi.fn(),
+    quickAddTaskAction: vi.fn(),
   },
   router: { push: vi.fn(), refresh: vi.fn(), replace: vi.fn(), prefetch: vi.fn() },
 }))
@@ -181,15 +182,6 @@ describe("WorkspaceScreen", () => {
     press("x")
 
     await waitFor(() => expect(todayLink).toHaveTextContent(String(workspace.counts.today - 1)))
-  })
-
-  it("adds a task from search with the quick add field", async () => {
-    renderScreen()
-
-    press("k", { metaKey: true })
-    await userEvent.click(await screen.findByRole("option", { name: /New task/ }))
-
-    await waitFor(() => expect(screen.getByRole("textbox", { name: "New task" })).toHaveFocus())
   })
 
   it("edits the open task", async () => {

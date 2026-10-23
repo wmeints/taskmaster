@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useEffect, useOptimistic, useRef, useState, useTransition } from "react";
+import { createContext, useContext, useEffect, useOptimistic, useState, useTransition } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { signOut } from "@/app/auth/actions";
 import { MobileTopBar } from "@/components/molecules/mobile-top-bar";
@@ -21,14 +21,12 @@ import { timeZoneCookie } from "@/lib/tasks/deadlines";
 import { headingFor } from "@/lib/tasks/headings";
 import { hrefFor, scopeFor } from "@/lib/tasks/routes";
 import { plannerViews, viewTitles, type Overview, type Scope, type View } from "@/lib/tasks/types";
-import { createListAction, deleteListAction } from "./actions";
+import { createListAction, deleteListAction, quickAddTaskAction } from "./actions";
 
 // Sidebar numbers predicted by the open view while a change is on its way to the server.
 type Prediction = Pick<Overview, "counts" | "lists">;
 
 type Shell = {
-  // The open view's quick add field, so search can focus it.
-  quickAddRef: React.RefObject<HTMLInputElement | null>;
   // Call inside a transition; the prediction lasts until the transition ends.
   predict: (prediction: Prediction) => void;
   // Opens a view or list, showing it loading until it arrives.
@@ -62,7 +60,6 @@ export function WorkspaceShell({
   const [prediction, predict] = useOptimistic<Prediction | null, Prediction>(null, (_, next) => next);
   const [navigating, startNavigation] = useTransition();
   const [destination, setDestination] = useState<Scope | null>(null);
-  const quickAddRef = useRef<HTMLInputElement>(null);
 
   const { counts, lists } = prediction ?? overview;
   const loading = navigating ? destination : null;
@@ -122,7 +119,7 @@ export function WorkspaceShell({
   );
 
   return (
-    <ShellContext value={{ quickAddRef, predict, navigate }}>
+    <ShellContext value={{ predict, navigate }}>
       <WorkspaceTemplate
         sidebar={sidebar}
         header={<MobileTopBar onOpenMenu={() => setSheet("menu")} onSearch={showSearch} />}
@@ -191,9 +188,10 @@ export function WorkspaceShell({
         onOpenChange={setSearchOpen}
         lists={lists}
         searchable={overview.searchable}
+        today={today}
         onNavigate={navigate}
-        onNewTask={() => quickAddRef.current?.focus()}
         onShowShortcuts={() => setShortcutsOpen(true)}
+        onAddTask={quickAddTaskAction}
       />
       <ShortcutsDialog open={shortcutsOpen} onOpenChange={setShortcutsOpen} />
     </ShellContext>

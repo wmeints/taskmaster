@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 
-import { dateForPreset, describeDate, describeDue, presetOf, todayIn, viewOf } from "./deadlines"
+import { dateForPreset, dateForWeekday, describeDate, describeDue, presetOf, todayIn, viewOf } from "./deadlines"
 
 // Wednesday 21 October 2026, as in the design.
 const today = "2026-10-21"
@@ -95,5 +95,14 @@ describe("todayIn", () => {
 
   it("falls back to UTC for an unknown time zone", () => {
     expect(todayIn("Not/AZone", new Date("2026-10-21T23:30:00Z"))).toBe("2026-10-21")
+  })
+})
+
+describe("dateForWeekday", () => {
+  // 21 October 2026 is a Wednesday.
+  it("finds the next given weekday, counting today", () => {
+    expect(dateForWeekday(5, "2026-10-21")).toBe("2026-10-23")
+    expect(dateForWeekday(3, "2026-10-21")).toBe("2026-10-21")
+    expect(dateForWeekday(1, "2026-10-21")).toBe("2026-10-26")
   })
 })

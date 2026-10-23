@@ -2,7 +2,7 @@ import "server-only";
 import { cache } from "react";
 import { z } from "zod";
 import { pool } from "@/lib/db";
-import { dateForPreset, viewOf, type View } from "./deadlines";
+import { dateForPreset, viewOf, type Due, type View } from "./deadlines";
 import type { TaskChanges } from "./schemas";
 import { listColors, viewTitles, type ListColor, type Overview, type Scope, type Subtask, type Task, type Workspace } from "./types";
 
@@ -69,23 +69,38 @@ const load = cache(async (userId: string, today: string) => {
       ...list,
       openCount: open.filter((task) => task.list?.id === list.id).length,
     })),
-    searchable: open.map((task) => ({ id: task.id, title: task.title, view: viewOf(task.due?.date ?? null, today) })),
+    searchable: tasks.map((task) => ({
+      id: task.id,
+      title: task.title,
+      view: viewOf(task.due?.date ?? null, today),
+      completed: task.completed,
+    })),
   };
   return { overview, tasks, listsById };
 });
 
-// Adds a task to a view (taking that view's deadline) or to a list. Returns the new task's id.
+// Adds a task to a view (taking that view's deadline) or to a list, or with an explicit deadline and list.
+// Returns the new task's id.
 export async function createTask(
   userId: string,
-  { title, scope, today }: { title: string; scope: Scope; today: string },
+  task: { title: string } & ({ scope: Scope; today: string } | { due: Due | null; listId: string | null }),
 ): Promise<string> {
-  const dueDate = "view" in scope && scope.view !== "inbox" ? dateForPreset(scope.view, today) : null;
-  const listId = "listId" in scope ? scope.listId : null;
+  const { title } = task;
+  let due: Due | null;
+  let listId: string | null;
+  if ("scope" in task) {
+    const { scope, today } = task;
+    const date = "view" in scope && scope.view !== "inbox" ? dateForPreset(scope.view, today) : null;
+    due = date ? { date, time: null } : null;
+    listId = "listId" in scope ? scope.listId : null;
+  } else {
+    ({ due, listId } = task);
+  }
   const { rows } = await pool.query<{ id: string }>(
-    `insert into tasks (user_id, title, due_date, list_id)
-     values ($1, $2, $3, (select id from lists where id = $4 and user_id = $1))
+    `insert into tasks (user_id, title, due_date, list_id, due_time)
+     values ($1, $2, $3, (select id from lists where id = $4 and user_id = $1), $5)
      returning id`,
-    [userId, title, dueDate, listId],
+    [userId, title, due?.date ?? null, listId, due?.time ?? null],
   );
   return rows[0].id;
 }

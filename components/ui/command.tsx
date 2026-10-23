@@ -68,22 +68,47 @@ function CommandDialog({
 
 function CommandInput({
   className,
+  size = "default",
+  trailing,
   ...props
-}: React.ComponentProps<typeof CommandPrimitive.Input>) {
+}: Omit<React.ComponentProps<typeof CommandPrimitive.Input>, "size"> & {
+  // "lg" spans the dialog's width with a border below, for a command palette.
+  size?: "default" | "lg"
+  // Shown at the end of the input, such as a key hint.
+  trailing?: React.ReactNode
+}) {
   return (
-    <div data-slot="command-input-wrapper" className="p-1 pb-0">
-      <InputGroup className="h-8! rounded-lg! border-input/30 bg-input/30 shadow-none! *:data-[slot=input-group-addon]:pl-2!">
+    <div
+      data-slot="command-input-wrapper"
+      className={cn("p-1 pb-0", size === "lg" && "border-b p-0")}
+    >
+      <InputGroup
+        className={cn(
+          "h-8! rounded-lg! border-input/30 bg-input/30 shadow-none! *:data-[slot=input-group-addon]:pl-2!",
+          size === "lg" &&
+            "h-13! rounded-none! border-0 bg-transparent! px-2 *:data-[slot=input-group-addon]:pl-2!"
+        )}
+      >
         <CommandPrimitive.Input
           data-slot="command-input"
           className={cn(
             "w-full text-sm outline-hidden disabled:cursor-not-allowed disabled:opacity-50",
+            size === "lg" && "text-base",
             className
           )}
           {...props}
         />
         <InputGroupAddon>
-          <SearchIcon className="size-4 shrink-0 opacity-50" />
+          <SearchIcon
+            className={cn(
+              "size-4 shrink-0 opacity-50",
+              size === "lg" && "size-5 opacity-70"
+            )}
+          />
         </InputGroupAddon>
+        {trailing && (
+          <InputGroupAddon align="inline-end">{trailing}</InputGroupAddon>
+        )}
       </InputGroup>
     </div>
   )

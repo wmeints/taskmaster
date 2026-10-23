@@ -33,6 +33,11 @@ export function dateForPreset(preset: DeadlinePreset, today: string): string | n
   }
 }
 
+// The next given weekday (0 is Sunday), counting today.
+export function dateForWeekday(weekday: number, today: string): string {
+  return addDays(today, (weekday - toUtcDate(today).getUTCDay() + 7) % 7)
+}
+
 // The preset that would set this deadline, or null when it was picked from the calendar.
 export function presetOf(date: string | null, today: string): DeadlinePreset | null {
   return presets.find((preset) => dateForPreset(preset, today) === date) ?? null

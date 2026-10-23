@@ -82,7 +82,10 @@ export const workspace: Workspace = {
   todo,
   completed,
   searchable: [
-    ...todo.map((task) => ({ id: task.id, title: task.title, view: "today" as const })),
-    { id: "0b6c3a52-6a8e-4f1b-9d2e-3c4b5a697806", title: "Order paint samples", view: "tomorrow" as const },
+    ...todo.map((task) => ({ id: task.id, title: task.title, view: "today" as const, completed: false })),
+    ...completed.map((task) => ({ id: task.id, title: task.title, view: "today" as const, completed: true })),
+    { id: "0b6c3a52-6a8e-4f1b-9d2e-3c4b5a697806", title: "Order paint samples", view: "tomorrow", completed: false },
+    { id: "0b6c3a52-6a8e-4f1b-9d2e-3c4b5a697807", title: "Find a dentist near the new place", view: "inbox", completed: false },
+    { id: "0b6c3a52-6a8e-4f1b-9d2e-3c4b5a697808", title: "Book dentist check-up", view: "today", completed: true },
   ],
 }

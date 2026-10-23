@@ -48,7 +48,7 @@ export function WorkspaceScreen({
   // The sheet small screens use to add a task.
   const [adding, setAdding] = useState(false);
   const [focusRequest, setFocusRequest] = useState<{ target: FocusTarget } | null>(null);
-  const { quickAddRef } = shell;
+  const quickAddRef = useRef<HTMLInputElement>(null);
   const deadlineRef = useRef<HTMLButtonElement>(null);
   const subtaskRef = useRef<HTMLInputElement>(null);
   const addRef = useRef<HTMLInputElement>(null);

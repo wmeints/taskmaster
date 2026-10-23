@@ -6,7 +6,7 @@ import { workspace } from "@/components/organisms/workspace.fixtures"
 
 const { actions, navigation, router, signOut } = vi.hoisted(() => ({
   signOut: vi.fn(),
-  actions: { createListAction: vi.fn(), deleteListAction: vi.fn() },
+  actions: { createListAction: vi.fn(), deleteListAction: vi.fn(), quickAddTaskAction: vi.fn() },
   router: { push: vi.fn(), refresh: vi.fn(), replace: vi.fn(), prefetch: vi.fn() },
   navigation: { pathname: "/today" },
 }))
@@ -162,6 +162,32 @@ describe("WorkspaceShell", () => {
 
     press("k", { metaKey: true })
     expect(await screen.findByRole("dialog", { name: "Search or command" })).toBeInTheDocument()
+  })
+
+  it("adds a task typed into search, with its deadline and list", async () => {
+    actions.quickAddTaskAction.mockResolvedValue({ id: "new-task" })
+    renderShell()
+
+    press("k", { metaKey: true })
+    await userEvent.type(await screen.findByRole("combobox"), "Call the dentist tomorrow #home{enter}")
+
+    expect(actions.quickAddTaskAction).toHaveBeenCalledWith({
+      title: "Call the dentist",
+      due: { date: "2026-10-22", time: null },
+      listId: workspace.lists[1].id,
+    })
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Search or command" })).not.toBeInTheDocument())
+  })
+
+  it("opens a task added from search with ⌘↵", async () => {
+    actions.quickAddTaskAction.mockResolvedValue({ id: "new-task" })
+    renderShell()
+
+    press("k", { metaKey: true })
+    await userEvent.type(await screen.findByRole("combobox"), "Water the plants fri")
+    await userEvent.keyboard("{Meta>}{Enter}{/Meta}")
+
+    await waitFor(() => expect(router.push).toHaveBeenCalledWith("/end-of-week?task=new-task"))
   })
 
   it("opens a new list after creating it", async () => {

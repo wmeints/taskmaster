@@ -8,11 +8,13 @@ import * as tasks from "@/lib/tasks";
 import {
   listSchema,
   newTaskSchema,
+  quickAddSchema,
   scopeSchema,
   subtaskSchema,
   taskChangesSchema,
   type ListValues,
   type NewTaskValues,
+  type QuickAddValues,
   type SubtaskValues,
   type TaskChanges,
 } from "@/lib/tasks/schemas";
@@ -32,6 +34,17 @@ export async function createTaskAction(scope: Scope, values: NewTaskValues): Pro
   if (!parsed.success) return { error: parsed.error.issues[0].message };
 
   const taskId = await tasks.createTask(userId, { ...parsed.data, scope: parsedScope.data, today: await getToday() });
+  refresh();
+  return { id: taskId };
+}
+
+// Adds a task from the command palette, with the deadline and list recognised in its text.
+export async function quickAddTaskAction(values: QuickAddValues): Promise<{ id: string } | { error: string }> {
+  const userId = await requireUserId();
+  const parsed = quickAddSchema.safeParse(values);
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
+
+  const taskId = await tasks.createTask(userId, parsed.data);
   refresh();
   return { id: taskId };
 }

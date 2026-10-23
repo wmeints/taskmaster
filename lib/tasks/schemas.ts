@@ -31,6 +31,9 @@ export const taskChangesSchema = z
   })
   .partial()
 
+// A task from the command palette, with the deadline and list read from its text.
+export const quickAddSchema = z.object({ title: title("Enter a task"), due: due.nullable(), listId: z.uuid().nullable() })
+
 export const scopeSchema = z.union([
   z.object({ view: z.enum(["inbox", "today", "tomorrow", "end-of-week", "later"]) }),
   z.object({ listId: z.uuid() }),
@@ -41,3 +44,4 @@ export type TaskDetailsValues = z.infer<typeof taskDetailsSchema>
 export type SubtaskValues = z.infer<typeof subtaskSchema>
 export type ListValues = z.infer<typeof listSchema>
 export type TaskChanges = z.infer<typeof taskChangesSchema>
+export type QuickAddValues = z.infer<typeof quickAddSchema>
