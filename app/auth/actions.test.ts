@@ -21,13 +21,13 @@ beforeEach(() => {
 describe("signUpWithEmail", () => {
   const values = { name: "Ada", email: "ada@example.com", password: "correct horse" }
 
-  it("creates the account and redirects to the account page", async () => {
+  it("creates the account and redirects to today", async () => {
     auth.signUp.email.mockResolvedValue({ error: null })
 
     await signUpWithEmail(values)
 
     expect(auth.signUp.email).toHaveBeenCalledWith(values)
-    expect(redirect).toHaveBeenCalledWith("/account")
+    expect(redirect).toHaveBeenCalledWith("/today")
   })
 
   it("rejects invalid input without calling the auth service", async () => {
@@ -50,13 +50,13 @@ describe("signUpWithEmail", () => {
 describe("signInWithEmail", () => {
   const values = { email: "ada@example.com", password: "secret" }
 
-  it("signs in and redirects to the account page", async () => {
+  it("signs in and redirects to today", async () => {
     auth.signIn.email.mockResolvedValue({ error: null })
 
     await signInWithEmail(values)
 
     expect(auth.signIn.email).toHaveBeenCalledWith(values)
-    expect(redirect).toHaveBeenCalledWith("/account")
+    expect(redirect).toHaveBeenCalledWith("/today")
   })
 
   it("rejects invalid input without calling the auth service", async () => {

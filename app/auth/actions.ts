@@ -17,7 +17,7 @@ export async function signUpWithEmail(values: SignUpValues): Promise<ActionResul
   if (error) {
     return { error: error.message || "Failed to create account" };
   }
-  redirect("/account");
+  redirect("/today");
 }
 
 export async function signInWithEmail(values: SignInValues): Promise<ActionResult> {
@@ -30,7 +30,7 @@ export async function signInWithEmail(values: SignInValues): Promise<ActionResul
   if (error) {
     return { error: error.message || "Failed to sign in" };
   }
-  redirect("/account");
+  redirect("/today");
 }
 
 export async function signOut() {
