@@ -85,6 +85,7 @@ export function WorkspaceShell({
   const sharedList = lists.find((list) => list.id === shareListId && list.owned);
 
   useTimeZoneCookie(router.refresh);
+  useSearchRequest(() => setSearchOpen(true), router.replace);
 
   // Navigates in a transition, so the shell knows when the next view has arrived.
   function navigate(href: string) {
@@ -248,6 +249,19 @@ export function useWorkspaceShell(): Shell {
   const shell = useContext(ShellContext);
   if (!shell) throw new Error("useWorkspaceShell must be used inside WorkspaceShell");
   return shell;
+}
+
+// Pages outside the workspace, such as the 404 page, link to a view with ?search to open search there.
+function useSearchRequest(openSearch: () => void, replace: (href: string) => void) {
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    if (!url.searchParams.has("search")) return;
+    openSearch();
+    url.searchParams.delete("search");
+    replace(url.pathname + url.search);
+    // Only on arrival; later visits come through the shell's own navigation.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 }
 
 // The server works out "today" from this cookie, so keep it in sync with the browser's time zone.

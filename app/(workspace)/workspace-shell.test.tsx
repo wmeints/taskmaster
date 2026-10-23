@@ -177,6 +177,15 @@ describe("WorkspaceShell", () => {
     expect(await screen.findByRole("dialog", { name: "Search or command" })).toBeInTheDocument()
   })
 
+  it("opens search when the address asks for it, and drops the request from the address", async () => {
+    window.history.replaceState(null, "", "/today?search")
+    renderShell()
+
+    expect(await screen.findByRole("dialog", { name: "Search or command" })).toBeInTheDocument()
+    expect(router.replace).toHaveBeenCalledWith("/today")
+    window.history.replaceState(null, "", "/")
+  })
+
   it("adds a task typed into search, with its deadline and list", async () => {
     actions.quickAddTaskAction.mockResolvedValue({ id: "new-task" })
     renderShell()
