@@ -20,6 +20,21 @@ const { actions, router } = vi.hoisted(() => ({
 vi.mock("./actions", () => actions)
 vi.mock("@/app/auth/actions", () => ({ signOut: vi.fn() }))
 vi.mock("next/navigation", () => ({ useRouter: () => router, usePathname: () => "/today" }))
+// A client-side navigation, as next/link performs it in the app.
+vi.mock("next/link", () => ({
+  default: ({ href, onNavigate, children, ...props }: React.ComponentProps<"a"> & { onNavigate?: (e: Event) => void }) => (
+    <a
+      href={href}
+      {...props}
+      onClick={(event) => {
+        event.preventDefault()
+        onNavigate?.(new Event("navigate"))
+      }}
+    >
+      {children}
+    </a>
+  ),
+}))
 
 import { WorkspaceScreen } from "./workspace-screen"
 import { WorkspaceShell } from "./workspace-shell"
@@ -160,7 +175,7 @@ describe("WorkspaceScreen", () => {
   it("updates the sidebar counts right away", async () => {
     actions.updateTaskAction.mockReturnValue(new Promise(() => {}))
     renderScreen({ initialTaskId: review.id })
-    const todayLink = screen.getByRole("link", { name: /Today/ })
+    const todayLink = within(screen.getByRole("navigation", { name: "Views" })).getByRole("link", { name: /Today/ })
     expect(todayLink).toHaveTextContent(String(workspace.counts.today))
 
     press("x")
@@ -183,5 +198,53 @@ describe("WorkspaceScreen", () => {
     await userEvent.click(within(detail()!).getByRole("button", { name: "Tomorrow" }))
 
     expect(actions.updateTaskAction).toHaveBeenCalledWith(review.id, { due: { date: "2026-10-22", time: "14:00" } })
+  })
+
+  describe("on small screens", () => {
+    // Swipes a row to the left with a finger.
+    function swipe(element: HTMLElement) {
+      const options = { pointerId: 1, pointerType: "touch", isPrimary: true, clientY: 20 }
+      fireEvent.pointerDown(element, { ...options, clientX: 300 })
+      for (let x = 300; x >= 160; x -= 20) fireEvent.pointerMove(element, { ...options, clientX: x })
+      fireEvent.pointerUp(element, { ...options, clientX: 160 })
+    }
+
+    it("switches between the planner's views with the pills", async () => {
+      renderScreen()
+      const pills = within(screen.getByRole("navigation", { name: "Planner" }))
+
+      expect(pills.getByRole("link", { name: `Today · ${workspace.counts.today}` })).toHaveAttribute("aria-current", "page")
+      await userEvent.click(pills.getByRole("link", { name: /Tomorrow/ }))
+
+      expect(router.push).toHaveBeenCalledWith("/tomorrow")
+    })
+
+    it("has no pills outside the planner", () => {
+      renderScreen({ workspace: { ...workspace, title: "Inbox", scope: { view: "inbox" } } })
+
+      expect(screen.queryByRole("navigation", { name: "Planner" })).not.toBeInTheDocument()
+    })
+
+    it("adds a task from the floating button", async () => {
+      renderScreen()
+
+      await userEvent.click(screen.getByRole("button", { name: "Add task" }))
+      const sheet = await screen.findByRole("dialog", { name: "New task" })
+      await userEvent.type(within(sheet).getByRole("textbox"), "Buy paint{enter}")
+
+      expect(actions.createTaskAction).toHaveBeenCalledWith({ view: "today" }, { title: "Buy paint" })
+      await waitFor(() => expect(screen.queryByRole("dialog", { name: "New task" })).not.toBeInTheDocument())
+    })
+
+    it("deletes a task by swiping it away", async () => {
+      renderScreen()
+
+      swipe(row(plumber.title))
+      await userEvent.click(within(row(plumber.title)).getByRole("button", { name: "Delete" }))
+
+      expect(actions.deleteTaskAction).toHaveBeenCalledWith(plumber.id)
+      expect(screen.queryByRole("button", { name: plumber.title })).not.toBeInTheDocument()
+      expect(detail()).not.toBeInTheDocument()
+    })
   })
 })

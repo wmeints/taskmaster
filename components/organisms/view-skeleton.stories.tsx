@@ -30,3 +30,11 @@ export const WithoutHeading: Story = {
     await expect(canvas.queryByRole("heading", { level: 1 })).not.toBeInTheDocument()
   },
 }
+
+// On small screens the planner's pills stay in place while the next view loads.
+export const WithTabs: Story = {
+  args: { tabs: <nav aria-label="Planner">Today · Tomorrow</nav> },
+  play: async ({ canvas }) => {
+    await expect(canvas.getByRole("navigation", { name: "Planner" })).toBeInTheDocument()
+  },
+}

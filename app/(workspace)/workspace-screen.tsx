@@ -1,19 +1,23 @@
 "use client";
 
 import { useEffect, useOptimistic, useRef, useState, useTransition } from "react";
+import { PlusIcon } from "lucide-react";
 import { InlineAddForm } from "@/components/molecules/inline-add-form";
+import { PlannerTabs } from "@/components/molecules/planner-tabs";
 import { ViewHeader } from "@/components/molecules/view-header";
 import { ShortcutBar } from "@/components/organisms/shortcut-bar";
 import { TaskDetail } from "@/components/organisms/task-detail";
 import { TaskList } from "@/components/organisms/task-list";
 import { ViewTemplate } from "@/components/templates/view-template";
+import { Button } from "@/components/ui/button";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { useShortcuts } from "@/hooks/use-shortcuts";
 import { viewOf } from "@/lib/tasks/deadlines";
 import { headingFor } from "@/lib/tasks/headings";
 import { applyChange, type Change } from "@/lib/tasks/optimistic";
 import { hrefFor } from "@/lib/tasks/routes";
 import { newTaskSchema, type TaskChanges } from "@/lib/tasks/schemas";
-import { viewTitles, type Task, type Workspace } from "@/lib/tasks/types";
+import { plannerViews, viewTitles, type Task, type View, type Workspace } from "@/lib/tasks/types";
 import {
   addSubtaskAction,
   createTaskAction,
@@ -41,15 +45,20 @@ export function WorkspaceScreen({
   const [selectedId, setSelectedId] = useState<string | null>(initialTaskId ?? null);
   const [detailOpen, setDetailOpen] = useState(initialTaskId !== undefined);
   const [hideCompleted, setHideCompleted] = useState(false);
+  // The sheet small screens use to add a task.
+  const [adding, setAdding] = useState(false);
   const [focusRequest, setFocusRequest] = useState<{ target: FocusTarget } | null>(null);
   const { quickAddRef } = shell;
   const deadlineRef = useRef<HTMLButtonElement>(null);
   const subtaskRef = useRef<HTMLInputElement>(null);
+  const addRef = useRef<HTMLInputElement>(null);
 
   const { scope, today } = workspace;
   const visible = hideCompleted ? workspace.todo : [...workspace.todo, ...workspace.completed];
   const selected = visible.find((task) => task.id === selectedId) ?? null;
   const open = detailOpen ? selected : null;
+  const plannerView =
+    "view" in scope && (plannerViews as readonly View[]).includes(scope.view) ? scope.view : null;
 
   useEffect(() => {
     if (selectedId) document.querySelector(`[data-task-id="${selectedId}"]`)?.scrollIntoView({ block: "nearest" });
@@ -94,6 +103,12 @@ export function WorkspaceScreen({
     return mutate({ type: "delete", taskId: task.id }, () => deleteTaskAction(task.id));
   }
 
+  async function addTask(values: { title: string }) {
+    const result = await createTaskAction(scope, values);
+    if ("id" in result) setSelectedId(result.id);
+    return result;
+  }
+
   function selectNeighbour(task: Task) {
     const index = visible.indexOf(task);
     setSelectedId((visible[index + 1] ?? visible[index - 1])?.id ?? null);
@@ -132,6 +147,11 @@ export function WorkspaceScreen({
   return (
     <ViewTemplate
       footer={<ShortcutBar />}
+      action={
+        <Button size="icon-lg" aria-label="Add task" onClick={() => setAdding(true)} className="size-14 rounded-2xl shadow-lg">
+          <PlusIcon className="size-6" />
+        </Button>
+      }
       detail={
         open && (
           <TaskDetail
@@ -164,17 +184,18 @@ export function WorkspaceScreen({
         subtitle={headingFor(scope, workspace)?.subtitle}
         onNewTask={() => quickAddRef.current?.focus()}
       />
-      <InlineAddForm
-        label="New task"
-        placeholder={`Add a task to ${workspace.title}…`}
-        schema={newTaskSchema}
-        inputRef={quickAddRef}
-        onAdd={async (values) => {
-          const result = await createTaskAction(scope, values);
-          if ("id" in result) setSelectedId(result.id);
-          return result;
-        }}
-      />
+      {plannerView && (
+        <PlannerTabs className="md:hidden" counts={workspace.counts} active={plannerView} onNavigate={shell.navigate} />
+      )}
+      <div className="max-md:hidden">
+        <InlineAddForm
+          label="New task"
+          placeholder={`Add a task to ${workspace.title}…`}
+          schema={newTaskSchema}
+          inputRef={quickAddRef}
+          onAdd={addTask}
+        />
+      </div>
       <TaskList
         todo={workspace.todo}
         completed={workspace.completed}
@@ -190,7 +211,31 @@ export function WorkspaceScreen({
           const task = visible.find((t) => t.id === taskId);
           if (task) updateTask(task, { completed });
         }}
+        onDelete={(taskId) => {
+          const task = visible.find((t) => t.id === taskId);
+          if (task) deleteTask(task);
+        }}
       />
+      <Sheet open={adding} onOpenChange={setAdding}>
+        <SheetContent side="bottom" initialFocus={addRef} className="pb-[env(safe-area-inset-bottom)]">
+          <SheetHeader>
+            <SheetTitle>New task</SheetTitle>
+          </SheetHeader>
+          <div className="px-4 pb-4">
+            <InlineAddForm
+              label="New task"
+              placeholder={`Add a task to ${workspace.title}…`}
+              schema={newTaskSchema}
+              inputRef={addRef}
+              onAdd={async (values) => {
+                const result = await addTask(values);
+                if ("id" in result) setAdding(false);
+                return result;
+              }}
+            />
+          </div>
+        </SheetContent>
+      </Sheet>
     </ViewTemplate>
   );
 }

@@ -11,6 +11,9 @@ export const viewTitles: Record<View, string> = {
   later: "Later",
 }
 
+// The deadline views, which small screens group under a Planner tab.
+export const plannerViews = ["today", "tomorrow", "end-of-week", "later"] as const satisfies View[]
+
 export const listColors = ["blue", "orange", "emerald", "violet", "amber", "rose", "cyan"] as const
 
 export type ListColor = (typeof listColors)[number]

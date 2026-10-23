@@ -1,29 +1,50 @@
 "use client"
 
-import { KeyHint } from "@/components/molecules/key-hint"
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { useId } from "react"
+import { XIcon } from "lucide-react"
 
-const groups: { title: string; shortcuts: { keys: string[]; label: string; range?: boolean }[] }[] = [
+import { ShortcutRow } from "@/components/molecules/shortcut-row"
+import { Button } from "@/components/ui/button"
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+
+const groups: { title: string; shortcuts: { keys: string[]; label: string }[] }[] = [
   {
-    title: "Tasks",
+    title: "Navigate",
     shortcuts: [
-      { keys: ["N"], label: "New task" },
-      { keys: ["J", "K"], label: "Move down and up" },
-      { keys: ["↵"], label: "Open task" },
-      { keys: ["X"], label: "Mark complete" },
-      { keys: ["D"], label: "Set deadline" },
-      { keys: ["S"], label: "Add subtask" },
-      { keys: ["⌫"], label: "Delete task" },
-      { keys: ["Esc"], label: "Close task" },
+      { keys: ["J"], label: "Next task" },
+      { keys: ["K"], label: "Previous task" },
+      { keys: ["↵"], label: "Open details" },
+      { keys: ["Esc"], label: "Close or go back" },
+      { keys: ["1"], label: "Inbox" },
+      { keys: ["2"], label: "Today" },
+      { keys: ["3"], label: "Tomorrow" },
+      { keys: ["4"], label: "End of week" },
+      { keys: ["5"], label: "Later" },
     ],
   },
   {
-    title: "Navigation",
+    title: "Tasks",
     shortcuts: [
-      { keys: ["1", "5"], label: "Switch view", range: true },
+      { keys: ["N"], label: "New task here" },
+      { keys: ["X"], label: "Complete or reopen" },
+      { keys: ["D"], label: "Set deadline" },
+      { keys: ["S"], label: "Add subtask" },
+      { keys: ["⌫"], label: "Delete" },
+    ],
+  },
+  {
+    title: "Lists and views",
+    shortcuts: [
       { keys: ["H"], label: "Hide or show completed" },
-      { keys: ["⌘", "K"], label: "Search or run a command" },
-      { keys: ["?"], label: "Show this list" },
+      { keys: ["⌘", "K"], label: "Command palette" },
+      { keys: ["?"], label: "This overview" },
     ],
   },
 ]
@@ -35,22 +56,32 @@ function ShortcutsDialog({
   open: boolean
   onOpenChange: React.ComponentProps<typeof Dialog>["onOpenChange"]
 }) {
+  const id = useId()
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>Keyboard shortcuts</DialogTitle>
-          <DialogDescription>Everything in Taskmaster works without a mouse.</DialogDescription>
-        </DialogHeader>
-        <div className="grid gap-5 sm:grid-cols-2">
-          {groups.map((group) => (
-            <section key={group.title} className="flex flex-col gap-2">
-              <h3 className="text-xs font-medium text-muted-foreground">{group.title}</h3>
-              <ul className="flex flex-col gap-2">
+      <DialogContent
+        showCloseButton={false}
+        className="max-h-[calc(100dvh-2rem)] gap-6 overflow-y-auto p-7 sm:max-w-[55rem]"
+      >
+        <div className="flex items-start justify-between gap-4">
+          <DialogHeader className="gap-1.5">
+            <DialogTitle className="text-lg font-semibold">Keyboard shortcuts</DialogTitle>
+            <DialogDescription>Single keys work whenever you are not typing in a field.</DialogDescription>
+          </DialogHeader>
+          <DialogClose render={<Button variant="outline" size="icon-lg" aria-label="Close" />}>
+            <XIcon />
+          </DialogClose>
+        </div>
+        <div className="grid gap-x-7 gap-y-6 sm:grid-cols-3">
+          {groups.map((group, index) => (
+            <section key={group.title} aria-labelledby={`${id}-${index}`} className="flex flex-col gap-2">
+              <h3 id={`${id}-${index}`} className="text-sm font-semibold text-foreground/80">
+                {group.title}
+              </h3>
+              <ul className="flex flex-col">
                 {group.shortcuts.map((shortcut) => (
-                  <li key={shortcut.label}>
-                    <KeyHint {...shortcut} className="text-sm text-foreground" />
-                  </li>
+                  <ShortcutRow key={shortcut.label} {...shortcut} />
                 ))}
               </ul>
             </section>

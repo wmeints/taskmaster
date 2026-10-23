@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite"
-import { expect, fn } from "storybook/test"
+import { expect, fireEvent, fn } from "storybook/test"
 
 import { TaskRow } from "./task-row"
 
@@ -67,5 +67,61 @@ export const TogglesOnCheckbox: Story = {
 
     await expect(args.onToggle).toHaveBeenCalled()
     await expect(args.onSelect).not.toHaveBeenCalled()
+  },
+}
+
+// Swiping a row to the left on a touch screen reveals a delete button.
+function swipe(row: HTMLElement, distance: number) {
+  const options = { pointerId: 1, pointerType: "touch", isPrimary: true, clientY: 20 }
+  fireEvent.pointerDown(row, { ...options, clientX: 400 })
+  for (let x = 400; x >= 400 - distance; x -= 20) fireEvent.pointerMove(row, { ...options, clientX: x })
+  fireEvent.pointerUp(row, { ...options, clientX: 400 - distance })
+}
+
+export const SwipesToDelete: Story = {
+  args: { onDelete: fn() },
+  play: async ({ args, canvas, userEvent }) => {
+    await expect(canvas.queryByRole("button", { name: "Delete" })).not.toBeInTheDocument()
+
+    swipe(canvas.getByRole("listitem"), 120)
+    await userEvent.click(await canvas.findByRole("button", { name: "Delete" }))
+
+    await expect(args.onDelete).toHaveBeenCalled()
+    await expect(args.onSelect).not.toHaveBeenCalled()
+  },
+}
+
+export const ShortSwipeSnapsBack: Story = {
+  args: { onDelete: fn() },
+  play: async ({ args, canvas }) => {
+    swipe(canvas.getByRole("listitem"), 20)
+
+    await expect(canvas.queryByRole("button", { name: "Delete" })).not.toBeInTheDocument()
+    await expect(args.onSelect).not.toHaveBeenCalled()
+  },
+}
+
+export const TapClosesTheSwipe: Story = {
+  args: { onDelete: fn() },
+  play: async ({ args, canvas, userEvent }) => {
+    swipe(canvas.getByRole("listitem"), 120)
+    await userEvent.click(canvas.getByRole("button", { name: "Call the plumber about the kitchen tap" }))
+
+    await expect(canvas.queryByRole("button", { name: "Delete" })).not.toBeInTheDocument()
+    await expect(args.onSelect).not.toHaveBeenCalled()
+  },
+}
+
+// A mouse drag doesn't swipe: desktop has the delete key and the details panel.
+export const IgnoresMouseDrags: Story = {
+  args: { onDelete: fn() },
+  play: async ({ canvas }) => {
+      const row = canvas.getByRole("listitem")
+    const options = { pointerId: 1, pointerType: "mouse", clientY: 20 }
+    fireEvent.pointerDown(row, { ...options, clientX: 400 })
+    fireEvent.pointerMove(row, { ...options, clientX: 250 })
+    fireEvent.pointerUp(row, { ...options, clientX: 250 })
+
+    await expect(canvas.queryByRole("button", { name: "Delete" })).not.toBeInTheDocument()
   },
 }

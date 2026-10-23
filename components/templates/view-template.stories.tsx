@@ -43,6 +43,14 @@ export const WithoutDetail: Story = {
   },
 }
 
+// The floating button that adds a task on small screens.
+export const WithAction: Story = {
+  args: { detail: undefined, action: <button type="button">New task</button> },
+  play: async ({ canvas }) => {
+    await expect(canvas.getByText("New task")).toBeInTheDocument()
+  },
+}
+
 export const Busy: Story = {
   args: { busy: true, detail: undefined },
   play: async ({ canvas }) => {

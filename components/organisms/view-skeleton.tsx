@@ -12,18 +12,28 @@ const noop = () => {}
 
 // A view while its tasks load. The heading is shown when it is already known, so switching views
 // updates the title straight away; the controls are inert until the real view takes over.
-function ViewSkeleton({ heading }: { heading: Heading | null }) {
+function ViewSkeleton({
+  heading,
+  tabs,
+}: {
+  heading: Heading | null
+  // The pills for switching views on small screens, when the view has them.
+  tabs?: React.ReactNode
+}) {
   return (
     <div inert className="flex flex-col gap-6">
       {heading ? (
         <>
           <ViewHeader title={heading.title} subtitle={heading.subtitle} onNewTask={noop} />
-          <InlineAddForm
-            label="New task"
-            placeholder={`Add a task to ${heading.title}…`}
-            schema={newTaskSchema}
-            onAdd={async () => {}}
-          />
+          {tabs}
+          <div className="max-md:hidden">
+            <InlineAddForm
+              label="New task"
+              placeholder={`Add a task to ${heading.title}…`}
+              schema={newTaskSchema}
+              onAdd={async () => {}}
+            />
+          </div>
         </>
       ) : (
         <>

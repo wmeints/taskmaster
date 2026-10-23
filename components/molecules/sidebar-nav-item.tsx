@@ -25,7 +25,8 @@ function SidebarNavItem({
   pending?: boolean
   // Takes over client-side navigation, e.g. to show a loading state. Opening in a new tab still works.
   onNavigate?: () => void
-  // A control next to the link, such as a menu; shown in place of the count on hover or focus.
+  // A control next to the link, such as a menu; shown in place of the count on hover or focus, and
+  // always on touch screens.
   action?: React.ReactNode
 }) {
   return (
@@ -56,7 +57,9 @@ function SidebarNavItem({
             <span
               className={cn(
                 "text-xs text-muted-foreground tabular-nums",
-                action && "group-focus-within/nav-item:invisible group-hover/nav-item:invisible"
+                action && "group-focus-within/nav-item:invisible group-hover/nav-item:invisible",
+                // Touch screens can't hover, so the action stays visible next to the count.
+                action && "pointer-coarse:visible! pointer-coarse:mr-8"
               )}
             >
               {count}
@@ -65,7 +68,7 @@ function SidebarNavItem({
         )}
       </Link>
       {action && !pending && (
-        <div className="absolute inset-y-0 right-1.5 flex items-center opacity-0 group-focus-within/nav-item:opacity-100 group-hover/nav-item:opacity-100 has-aria-expanded:opacity-100">
+        <div className="absolute inset-y-0 right-1.5 flex items-center opacity-0 group-focus-within/nav-item:opacity-100 group-hover/nav-item:opacity-100 has-aria-expanded:opacity-100 pointer-coarse:opacity-100">
           {action}
         </div>
       )}

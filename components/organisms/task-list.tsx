@@ -19,6 +19,7 @@ function TaskList({
   onToggleHideCompleted,
   onSelect,
   onToggle,
+  onDelete,
 }: {
   todo: Task[]
   completed: Task[]
@@ -28,9 +29,11 @@ function TaskList({
   onToggleHideCompleted: () => void
   onSelect: (taskId: string) => void
   onToggle: (taskId: string, completed: boolean) => void
+  // Lets rows be swiped away on touch screens.
+  onDelete?: (taskId: string) => void
 }) {
   const rows = (tasks: Task[]) => (
-    <ul className="flex flex-col gap-0.5">
+    <ul className="flex flex-col gap-0.5 max-md:gap-0">
       {tasks.map((task) => (
         <TaskRow
           key={task.id}
@@ -39,6 +42,7 @@ function TaskList({
           selected={task.id === selectedId}
           onSelect={() => onSelect(task.id)}
           onToggle={(done) => onToggle(task.id, done)}
+          onDelete={onDelete && (() => onDelete(task.id))}
         />
       ))}
     </ul>
@@ -55,7 +59,7 @@ function TaskList({
 
       {completed.length > 0 && (
         <>
-          <Separator />
+          <Separator className="max-md:hidden" />
           <section aria-labelledby="task-list-completed" className="flex flex-col gap-2">
             <div id="task-list-completed">
               <SectionHeading
@@ -71,7 +75,7 @@ function TaskList({
                   >
                     {hideCompleted ? <EyeIcon data-icon="inline-start" /> : <EyeOffIcon data-icon="inline-start" />}
                     {hideCompleted ? "Show" : "Hide"}
-                    <Kbd aria-hidden className="border bg-background">
+                    <Kbd aria-hidden className="border bg-background max-md:hidden">
                       H
                     </Kbd>
                   </Button>

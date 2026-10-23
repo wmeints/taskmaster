@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react"
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
@@ -40,6 +40,11 @@ function renderShell() {
       <p>The view</p>
     </WorkspaceShell>,
   )
+}
+
+// A view in the sidebar; small screens show some of them as pills and tabs too.
+function sidebarView(name: RegExp) {
+  return within(screen.getByRole("navigation", { name: "Views" })).getByRole("link", { name })
 }
 
 let finishNavigation = () => {}
@@ -86,22 +91,22 @@ describe("WorkspaceShell", () => {
     renderShell()
 
     expect(screen.getByRole("link", { name: /Home renovation/ })).toHaveAttribute("aria-current", "page")
-    expect(screen.getByRole("link", { name: /Today/ })).not.toHaveAttribute("aria-current")
+    expect(sidebarView(/Today/)).not.toHaveAttribute("aria-current")
   })
 
   it("shows the clicked view loading until it arrives", async () => {
     slowNavigation()
     renderShell()
 
-    await userEvent.click(screen.getByRole("link", { name: /Tomorrow/ }))
+    await userEvent.click(sidebarView(/Tomorrow/))
 
     expect(router.push).toHaveBeenCalledWith("/tomorrow")
     expect(screen.getByRole("heading", { level: 1, name: "Tomorrow" })).toBeInTheDocument()
     expect(screen.getByText("Thursday 22 October")).toBeInTheDocument()
     expect(screen.getByRole("progressbar", { name: "Loading" })).toBeInTheDocument()
     expect(screen.queryByText("The view")).not.toBeInTheDocument()
-    expect(screen.getByRole("link", { name: /Tomorrow/ })).toHaveAttribute("aria-current", "page")
-    expect(screen.getByRole("link", { name: /Tomorrow/ })).toHaveAttribute("aria-busy", "true")
+    expect(sidebarView(/Tomorrow/)).toHaveAttribute("aria-current", "page")
+    expect(sidebarView(/Tomorrow/)).toHaveAttribute("aria-busy", "true")
   })
 
   it("shows a list loading with its number of open tasks", async () => {
@@ -119,7 +124,7 @@ describe("WorkspaceShell", () => {
     router.push.mockReturnValue(undefined)
     renderShell()
 
-    await userEvent.click(screen.getByRole("link", { name: /Tomorrow/ }))
+    await userEvent.click(sidebarView(/Tomorrow/))
 
     expect(await screen.findByText("The view")).toBeInTheDocument()
     expect(screen.queryByRole("progressbar")).not.toBeInTheDocument()
@@ -202,6 +207,85 @@ describe("WorkspaceShell", () => {
     await userEvent.click(await screen.findByRole("menuitem", { name: "Sign out" }))
 
     await waitFor(() => expect(signOut).toHaveBeenCalled())
+  })
+
+  describe("on small screens", () => {
+    it("opens a menu with every view and list, which closes on navigating", async () => {
+      renderShell()
+
+      await userEvent.click(screen.getByRole("button", { name: "Open menu" }))
+      const menu = await screen.findByRole("dialog", { name: "Menu" })
+      await userEvent.click(within(menu).getByRole("link", { name: /Website relaunch/ }))
+
+      expect(router.push).toHaveBeenCalledWith(`/lists/${workspace.lists[0].id}`)
+      await waitFor(() => expect(screen.queryByRole("dialog", { name: "Menu" })).not.toBeInTheDocument())
+    })
+
+    it("opens search from the top bar", async () => {
+      renderShell()
+
+      await userEvent.click(screen.getByRole("button", { name: "Search" }))
+
+      expect(await screen.findByRole("dialog", { name: "Search or command" })).toBeInTheDocument()
+    })
+
+    it("marks the tab of the view on screen", () => {
+      renderShell()
+      const tabs = within(screen.getByRole("navigation", { name: "Sections" }))
+
+      expect(tabs.getByRole("link", { name: "Planner" })).toHaveAttribute("aria-current", "page")
+      expect(tabs.getByRole("link", { name: "Inbox" })).not.toHaveAttribute("aria-current")
+    })
+
+    it("marks the lists tab in a list", () => {
+      navigation.pathname = `/lists/${workspace.lists[0].id}`
+      renderShell()
+      const tabs = within(screen.getByRole("navigation", { name: "Sections" }))
+
+      expect(tabs.getByRole("button", { name: "Lists" })).toHaveAttribute("data-active", "true")
+      expect(tabs.getByRole("link", { name: "Planner" })).not.toHaveAttribute("aria-current")
+    })
+
+    it("opens the inbox from the tabs", async () => {
+      renderShell()
+
+      await userEvent.click(within(screen.getByRole("navigation", { name: "Sections" })).getByRole("link", { name: "Inbox" }))
+
+      expect(router.push).toHaveBeenCalledWith("/inbox")
+    })
+
+    it("shows the lists in a sheet", async () => {
+      renderShell()
+
+      await userEvent.click(screen.getByRole("button", { name: "Lists" }))
+      const sheet = await screen.findByRole("dialog", { name: "Lists" })
+      await userEvent.click(within(sheet).getByRole("link", { name: /Home renovation/ }))
+
+      expect(router.push).toHaveBeenCalledWith(`/lists/${workspace.lists[1].id}`)
+      await waitFor(() => expect(screen.queryByRole("dialog", { name: "Lists" })).not.toBeInTheDocument())
+    })
+
+    it("shows search, the shortcuts and the account under More", async () => {
+      renderShell()
+
+      await userEvent.click(screen.getByRole("button", { name: "More" }))
+      const sheet = await screen.findByRole("dialog", { name: "More" })
+      expect(within(sheet).getByText("ada@example.com")).toBeInTheDocument()
+      await userEvent.click(within(sheet).getByRole("button", { name: "Keyboard shortcuts" }))
+
+      expect(await screen.findByRole("dialog", { name: "Keyboard shortcuts" })).toBeInTheDocument()
+      await waitFor(() => expect(screen.queryByRole("dialog", { name: "More" })).not.toBeInTheDocument())
+    })
+
+    it("keeps the planner's pills while the next view loads", async () => {
+      slowNavigation()
+      renderShell()
+
+      press("3")
+
+      const pills = within(screen.getByRole("navigation", { name: "Planner" }))
+      expect(pills.getByRole("link", { name: /Tomorrow/ })).toHaveAttribute("aria-busy", "true")
+    })
   })
 
   it("stores the browser's time zone and refreshes when it changed", () => {

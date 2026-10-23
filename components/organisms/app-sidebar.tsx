@@ -1,30 +1,26 @@
 "use client"
 
-import { useState } from "react"
+import { useId } from "react"
 import {
   CalendarDaysIcon,
   ClockIcon,
   InboxIcon,
   KeyboardIcon,
-  PlusIcon,
   SunIcon,
   SunriseIcon,
   type LucideIcon,
 } from "lucide-react"
 
-import { ListDot } from "@/components/atoms/list-dot"
 import { AccountMenu } from "@/components/molecules/account-menu"
-import { AddListForm } from "@/components/molecules/add-list-form"
-import { ListActionsMenu } from "@/components/molecules/list-actions-menu"
 import { Logo } from "@/components/molecules/logo"
 import { SearchTrigger } from "@/components/molecules/search-trigger"
 import { SidebarNavItem } from "@/components/molecules/sidebar-nav-item"
-import { Button } from "@/components/ui/button"
 import { Kbd } from "@/components/ui/kbd"
 import { Separator } from "@/components/ui/separator"
 import { hrefFor } from "@/lib/tasks/routes"
-import type { ListValues } from "@/lib/tasks/schemas"
 import { viewTitles, type List, type Scope, type View } from "@/lib/tasks/types"
+
+import { ListNav } from "./list-nav"
 
 const viewIcons: Record<View, LucideIcon> = {
   inbox: InboxIcon,
@@ -57,13 +53,12 @@ function AppSidebar({
   signOutAction: () => Promise<void>
   onSearch: () => void
   onShowShortcuts: () => void
-  onCreateList: (values: ListValues) => Promise<{ id: string } | { error: string }>
-  // Deletes a list after the user confirmed it; the lists get no actions menu without it.
-  onDeleteList?: (listId: string) => Promise<{ error: string } | void>
+  onCreateList: React.ComponentProps<typeof ListNav>["onCreateList"]
+  onDeleteList?: React.ComponentProps<typeof ListNav>["onDeleteList"]
   // Takes over navigation to a view or list.
   onNavigate?: (href: string) => void
 }) {
-  const [addingList, setAddingList] = useState(false)
+  const viewsId = useId()
 
   function item(href: string, active: boolean) {
     return {
@@ -74,19 +69,13 @@ function AppSidebar({
     }
   }
 
-  async function createList(values: ListValues) {
-    const result = await onCreateList(values)
-    if (!("error" in result)) setAddingList(false)
-    return result
-  }
-
   return (
     <div className="flex h-full w-full flex-col gap-5 p-3">
       <Logo className="px-2 pt-2 text-[0.95rem]" />
       <SearchTrigger onClick={onSearch} />
 
-      <nav aria-labelledby="sidebar-views" className="flex flex-col gap-1">
-        <h2 id="sidebar-views" className="px-2.5 pb-1 text-xs font-medium text-muted-foreground">
+      <nav aria-labelledby={viewsId} className="flex flex-col gap-1">
+        <h2 id={viewsId} className="px-2.5 pb-1 text-xs font-medium text-muted-foreground">
           Views
         </h2>
         <ul className="flex flex-col gap-0.5">
@@ -105,37 +94,14 @@ function AppSidebar({
         </ul>
       </nav>
 
-      <nav aria-labelledby="sidebar-lists" className="flex flex-col gap-1">
-        <div className="flex items-center justify-between pr-1">
-          <h2 id="sidebar-lists" className="px-2.5 text-xs font-medium text-muted-foreground">
-            Lists
-          </h2>
-          <Button
-            variant="ghost"
-            size="icon-xs"
-            aria-label="New list"
-            className="text-muted-foreground"
-            onClick={() => setAddingList(true)}
-          >
-            <PlusIcon />
-          </Button>
-        </div>
-        <ul className="flex flex-col gap-0.5">
-          {lists.map((list) => (
-            <SidebarNavItem
-              key={list.id}
-              {...item(hrefFor({ listId: list.id }), scope !== null && "listId" in scope && scope.listId === list.id)}
-              label={list.name}
-              count={list.openCount}
-              leading={<ListDot color={list.color} />}
-              action={
-                onDeleteList && <ListActionsMenu listName={list.name} onDelete={() => onDeleteList(list.id)} />
-              }
-            />
-          ))}
-        </ul>
-        {addingList && <AddListForm onAdd={createList} onCancel={() => setAddingList(false)} />}
-      </nav>
+      <ListNav
+        lists={lists}
+        scope={scope}
+        pending={pending}
+        onNavigate={onNavigate}
+        onCreateList={onCreateList}
+        onDeleteList={onDeleteList}
+      />
 
       <div className="mt-auto flex flex-col gap-3">
         <button
