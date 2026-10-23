@@ -1,42 +1,70 @@
-import Form from "next/form"
+"use client"
+
+import { useId } from "react"
+import { useRouter } from "next/navigation"
+import { zodResolver } from "@hookform/resolvers/zod"
 import { ArrowRight } from "lucide-react"
-import { cn } from "cn"
+import { Controller, useForm } from "react-hook-form"
+import type { z } from "zod"
 
 import { Button } from "@/components/ui/button"
+import { Field, FieldError, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
+import { signUpSchema } from "@/lib/auth/schemas"
+
+const emailSchema = signUpSchema.pick({ email: true })
+
+type EmailValues = z.infer<typeof emailSchema>
 
 // Hands the email over to the sign-up page, which prefills it.
 function EmailSignUpForm({
-  id,
   submitLabel,
   showArrow = false,
   className,
 }: {
-  id: string
   submitLabel: string
   showArrow?: boolean
   className?: string
 }) {
+  const id = useId()
+  const router = useRouter()
+  const form = useForm<EmailValues>({
+    resolver: zodResolver(emailSchema),
+    defaultValues: { email: "" },
+  })
+
+  function onSubmit({ email }: EmailValues) {
+    router.push(`/auth/sign-up?${new URLSearchParams({ email })}`)
+  }
+
   return (
-    <Form action="/auth/sign-up" className={cn("flex flex-col gap-2", className)}>
-      <Label htmlFor={id}>Email address</Label>
-      <div className="flex flex-col gap-2 sm:flex-row">
-        <Input
-          id={id}
-          name="email"
-          type="email"
-          autoComplete="email"
-          placeholder="you@example.com"
-          required
-          className="h-10 bg-background sm:flex-1"
-        />
-        <Button type="submit" size="lg" className="h-10 px-4">
-          {submitLabel}
-          {showArrow && <ArrowRight data-icon="inline-end" />}
-        </Button>
-      </div>
-    </Form>
+    <form noValidate onSubmit={form.handleSubmit(onSubmit)} className={className}>
+      <Controller
+        control={form.control}
+        name="email"
+        render={({ field, fieldState }) => (
+          <Field data-invalid={fieldState.invalid}>
+            <FieldLabel htmlFor={id}>Email address</FieldLabel>
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <Input
+                {...field}
+                id={id}
+                type="email"
+                autoComplete="email"
+                placeholder="you@example.com"
+                aria-invalid={fieldState.invalid}
+                className="h-10 bg-background sm:flex-1"
+              />
+              <Button type="submit" size="lg" className="h-10 px-4">
+                {submitLabel}
+                {showArrow && <ArrowRight data-icon="inline-end" />}
+              </Button>
+            </div>
+            {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+          </Field>
+        )}
+      />
+    </form>
   )
 }
 

@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite"
+import { getRouter } from "@storybook/nextjs-vite/navigation.mock"
 import { expect } from "storybook/test"
 
 import { EmailSignUpForm } from "./email-sign-up-form"
@@ -10,7 +11,6 @@ const meta = {
     nextjs: { appDirectory: true },
   },
   args: {
-    id: "email",
     submitLabel: "Sign up",
   },
 } satisfies Meta<typeof EmailSignUpForm>
@@ -23,10 +23,8 @@ export const Default: Story = {
   play: async ({ canvas }) => {
     const input = canvas.getByRole("textbox", { name: "Email address" })
 
-    await expect(input).toHaveAttribute("name", "email")
     await expect(input).toHaveAttribute("type", "email")
-    await expect(input).toBeRequired()
-    await expect(input.closest("form")).toHaveAttribute("action", "/auth/sign-up")
+    await expect(input).toHaveAttribute("autocomplete", "email")
   },
 }
 
@@ -47,6 +45,17 @@ export const RejectsInvalidEmail: Story = {
     await userEvent.type(input, "not-an-email")
     await userEvent.click(canvas.getByRole("button", { name: "Sign up" }))
 
-    await expect(input).toBeInvalid()
+    await expect(await canvas.findByRole("alert")).toHaveTextContent("Enter a valid email address")
+    await expect(input).toHaveAttribute("aria-invalid", "true")
+    await expect(getRouter().push).not.toHaveBeenCalled()
+  },
+}
+
+export const HandsEmailToSignUpPage: Story = {
+  play: async ({ canvas, userEvent }) => {
+    await userEvent.type(canvas.getByRole("textbox", { name: "Email address" }), "ada+todo@example.com")
+    await userEvent.click(canvas.getByRole("button", { name: "Sign up" }))
+
+    await expect(getRouter().push).toHaveBeenCalledWith("/auth/sign-up?email=ada%2Btodo%40example.com")
   },
 }

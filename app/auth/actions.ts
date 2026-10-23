@@ -2,26 +2,31 @@
 
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth/server";
+import { signInSchema, signUpSchema, type SignInValues, type SignUpValues } from "@/lib/auth/schemas";
 
-type FormState = { error: string } | null;
+type ActionResult = { error: string } | undefined;
 
-export async function signUpWithEmail(_prev: FormState, formData: FormData) {
-  const { error } = await auth.signUp.email({
-    name: String(formData.get("name") ?? ""),
-    email: String(formData.get("email") ?? ""),
-    password: String(formData.get("password") ?? ""),
-  });
+export async function signUpWithEmail(values: SignUpValues): Promise<ActionResult> {
+  // Never trust the client: re-validate with the same schema the form uses.
+  const parsed = signUpSchema.safeParse(values);
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0].message };
+  }
+
+  const { error } = await auth.signUp.email(parsed.data);
   if (error) {
     return { error: error.message || "Failed to create account" };
   }
   redirect("/account");
 }
 
-export async function signInWithEmail(_prev: FormState, formData: FormData) {
-  const { error } = await auth.signIn.email({
-    email: String(formData.get("email") ?? ""),
-    password: String(formData.get("password") ?? ""),
-  });
+export async function signInWithEmail(values: SignInValues): Promise<ActionResult> {
+  const parsed = signInSchema.safeParse(values);
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0].message };
+  }
+
+  const { error } = await auth.signIn.email(parsed.data);
   if (error) {
     return { error: error.message || "Failed to sign in" };
   }

@@ -20,7 +20,7 @@ function Hero() {
           and the rest of the week, and share lists with the people you work with.
         </p>
         <div className="flex max-w-md flex-col gap-3">
-          <EmailSignUpForm id="hero-email" submitLabel="Create account" showArrow />
+          <EmailSignUpForm submitLabel="Create account" showArrow />
           <p className="text-sm text-muted-foreground">
             Already have an account?{" "}
             <Link href="/auth/sign-in" className="font-medium text-foreground underline">

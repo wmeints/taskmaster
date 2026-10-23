@@ -16,7 +16,7 @@ function CtaSection() {
         <p className="mt-3 text-muted-foreground">
           Create an account in seconds, or log in to pick up where you left off.
         </p>
-        <EmailSignUpForm id="cta-email" submitLabel="Sign up" className="mt-8 w-full text-left" />
+        <EmailSignUpForm submitLabel="Sign up" className="mt-8 w-full text-left" />
         <Link
           href="/auth/sign-in"
           className={cn(buttonVariants({ variant: "outline", size: "lg" }), "mt-4 h-10 px-4")}
