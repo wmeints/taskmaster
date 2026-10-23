@@ -74,6 +74,7 @@ variables must be set where the build runs.
 | `pnpm test:e2e`  | Cucumber end-to-end tests with Playwright against a Neon test branch (see below)   |
 | `pnpm test`      | Unit and UI tests                                                                  |
 | `pnpm lint`      | ESLint                                                                             |
+| `pnpm typecheck` | Generates the Next.js route types and runs the TypeScript compiler                 |
 
 The UI tests need a Playwright browser. Install it once with:
 
@@ -99,6 +100,14 @@ The tests sign up real users, so they need a Neon branch of their own:
 Before starting the app, the tests apply the migrations to that branch. They refuse to run when `.env.e2e` is
 missing or points at the same branch, database or auth server as `.env.local`. To see failures step by step, open
 the report with `pnpm exec playwright show-report`.
+
+### Continuous integration
+
+`.github/workflows/pull-request.yml` typechecks, lints and runs the unit, Storybook and end-to-end tests on every
+pull request to `main`. The end-to-end job writes `.env.e2e` from these repository secrets, which must point at the
+Neon test branch: `E2E_DATABASE_URL`, `E2E_DATABASE_URL_UNPOOLED`, `E2E_NEON_BRANCH`, `E2E_NEON_AUTH_BASE_URL`,
+`E2E_NEON_AUTH_JWKS_URL` and `E2E_NEON_AUTH_COOKIE_SECRET`. Because every run migrates that one branch, end-to-end
+runs from different pull requests take turns. If the report is needed, download it from the failed run's artifacts.
 
 ## Changing the database schema
 
