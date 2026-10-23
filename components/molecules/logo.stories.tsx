@@ -17,3 +17,10 @@ export const Default: Story = {
     await expect(canvas.getByRole("link", { name: "Taskmaster" })).toHaveAttribute("href", "/")
   },
 }
+
+export const CustomHref: Story = {
+  args: { href: "/today" },
+  play: async ({ canvas }) => {
+    await expect(canvas.getByRole("link", { name: "Taskmaster" })).toHaveAttribute("href", "/today")
+  },
+}

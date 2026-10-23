@@ -71,7 +71,7 @@ function AppSidebar({
 
   return (
     <div className="flex h-full w-full flex-col gap-5 p-3">
-      <Logo className="px-2 pt-2 text-[0.95rem]" />
+      <Logo href={hrefFor({ view: "today" })} className="px-2 pt-2 text-[0.95rem]" />
       <SearchTrigger onClick={onSearch} />
 
       <nav aria-labelledby={viewsId} className="flex flex-col gap-1">

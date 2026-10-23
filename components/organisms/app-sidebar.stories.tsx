@@ -34,6 +34,13 @@ export const Default: Story = {
   },
 }
 
+export const LogoLinksToToday: Story = {
+  args: { scope: { view: "inbox" } },
+  play: async ({ canvas }) => {
+    await expect(canvas.getByRole("link", { name: "Taskmaster" })).toHaveAttribute("href", "/today")
+  },
+}
+
 export const ActiveList: Story = {
   args: { scope: { listId: lists[1].id } },
   play: async ({ canvas }) => {
