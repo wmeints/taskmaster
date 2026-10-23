@@ -41,6 +41,17 @@ Repeat in small increments. Do not write production code without a failing test 
 
 Use shadcn components as much as possible to promote reuse. Before building a new atom, check whether a shadcn component exists for it and add it with `npx shadcn@latest add <component>` into `components/ui/`. Compose molecules and organisms from these primitives rather than writing custom equivalents.
 
+## Forms: React Hook Form with Zod
+
+Build every form in the application with [React Hook Form](https://react-hook-form.com) and [Zod](https://zod.dev). Do not manage form state with `useState`, uncontrolled `FormData` reads, or native HTML validation attributes alone.
+
+- **Schema first** — define a Zod schema for each form and derive its type with `z.infer<typeof schema>`. Never hand-write a separate type for form values.
+- **Shared validation** — put schemas used by both the client and a server action in `lib/` (e.g. `lib/auth/schemas.ts`) so the server re-validates the same input with `schema.safeParse(...)`. Never trust client-side validation alone.
+- **Wire up with the resolver** — `useForm({ resolver: zodResolver(schema), defaultValues })` from `@hookform/resolvers/zod`. Always provide `defaultValues` for every field.
+- **Compose with shadcn `Field` atoms** — render each input through react-hook-form's `Controller` and the primitives in `components/ui/field.tsx` (`FieldGroup`, `Field`, `FieldLabel`, `FieldDescription`, `FieldError`). Set `data-invalid={fieldState.invalid}` on `Field` and `aria-invalid={fieldState.invalid}` on the control. Do not hand-roll error markup.
+- **Submitting** — handle submission in `form.handleSubmit(onSubmit)`; call server actions from `onSubmit` with the parsed, typed values. Use `formState.isSubmitting` for pending UI, and surface server errors with `form.setError` (use `"root"` for errors that are not tied to a field).
+- **Testing** — cover validation rules with Vitest tests against the schema, and cover the form's behavior (error messages shown, submit called with valid values) with Storybook interaction tests.
+
 ## Testing
 
 - **Components** — write Storybook stories with interaction tests (`*.stories.tsx`, placed next to the component) for every component you add. Run them with `npm run test:ui`.
