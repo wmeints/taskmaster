@@ -8,9 +8,11 @@ type FormState = { error: string } | null;
 export function AuthForm({
   mode,
   action,
+  defaultEmail,
 }: {
   mode: "sign-in" | "sign-up";
   action: (prev: FormState, formData: FormData) => Promise<FormState>;
+  defaultEmail?: string;
 }) {
   const [state, formAction, isPending] = useActionState(action, null);
   const isSignUp = mode === "sign-up";
@@ -24,7 +26,7 @@ export function AuthForm({
         {isSignUp && (
           <input name="name" placeholder="Name" required className="rounded-md border px-3 py-2" />
         )}
-        <input name="email" type="email" placeholder="Email" required className="rounded-md border px-3 py-2" />
+        <input name="email" type="email" placeholder="Email" defaultValue={defaultEmail} required className="rounded-md border px-3 py-2" />
         <input name="password" type="password" placeholder="Password" required minLength={8} className="rounded-md border px-3 py-2" />
         {state?.error && <p className="text-sm text-red-600">{state.error}</p>}
         <button type="submit" disabled={isPending} className="rounded-md bg-foreground px-3 py-2 text-background disabled:opacity-50">
