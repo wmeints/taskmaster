@@ -12,6 +12,7 @@ import { Kbd } from "@/components/ui/kbd"
 import { Label } from "@/components/ui/label"
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select"
 import { Progress } from "@/components/ui/progress"
+import { isPending } from "@/lib/tasks/optimistic"
 import { subtaskSchema, type SubtaskValues, type TaskChanges } from "@/lib/tasks/schemas"
 import type { List, Task } from "@/lib/tasks/types"
 
@@ -108,6 +109,7 @@ function TaskDetail({
                 <SubtaskItem
                   key={subtask.id}
                   subtask={subtask}
+                  saving={isPending(subtask)}
                   onToggle={(done) => onToggleSubtask(subtask.id, done)}
                   onDelete={() => onDeleteSubtask(subtask.id)}
                 />

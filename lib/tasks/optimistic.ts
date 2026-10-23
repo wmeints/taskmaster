@@ -1,6 +1,6 @@
 import { viewOf } from "./deadlines"
 import type { TaskChanges } from "./schemas"
-import type { Task, Workspace } from "./types"
+import type { Subtask, Task, Workspace } from "./types"
 
 // A change the user just made, applied to the screen before the server confirms it.
 export type Change =
@@ -27,7 +27,7 @@ export function applyChange(workspace: Workspace, change: Change): Workspace {
     case "add-subtask":
       return mapTasks(workspace, (task) =>
         task.id === change.taskId
-          ? { ...task, subtasks: [...task.subtasks, { id: `pending-${crypto.randomUUID()}`, title: change.title, done: false }] }
+          ? { ...task, subtasks: [...task.subtasks, pendingSubtask(change.title)] }
           : task,
       )
     case "update-subtask":
@@ -87,4 +87,16 @@ function mapTasks(workspace: Workspace, map: (task: Task) => Task): Workspace {
 
 function without(tasks: Task[], task: Task): Task[] {
   return tasks.filter((t) => t.id !== task.id)
+}
+
+const pendingPrefix = "pending-"
+
+// A subtask shown before the server saved it. Its id is temporary until the server's next render.
+export function pendingSubtask(title: string): Subtask {
+  return { id: `${pendingPrefix}${crypto.randomUUID()}`, title, done: false }
+}
+
+// Whether a subtask is still on its way to the server, so changing it would be lost.
+export function isPending(subtask: Subtask): boolean {
+  return subtask.id.startsWith(pendingPrefix)
 }

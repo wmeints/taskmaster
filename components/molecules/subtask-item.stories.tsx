@@ -35,3 +35,11 @@ export const Done: Story = {
     await expect(canvas.getByText("Run the branch locally")).toHaveClass("line-through")
   },
 }
+
+export const Saving: Story = {
+  args: { saving: true },
+  play: async ({ canvas }) => {
+    await expect(canvas.getByRole("checkbox", { name: "Check payment error states" })).toHaveAttribute("aria-disabled", "true")
+    await expect(canvas.getByRole("button", { name: "Delete subtask Check payment error states" })).toBeDisabled()
+  },
+}

@@ -10,10 +10,13 @@ import type { Subtask } from "@/lib/tasks/types"
 
 function SubtaskItem({
   subtask,
+  saving = false,
   onToggle,
   onDelete,
 }: {
   subtask: Subtask
+  // The subtask isn't saved yet, so it can't be changed.
+  saving?: boolean
   onToggle: (done: boolean) => void
   onDelete: () => void
 }) {
@@ -24,6 +27,7 @@ function SubtaskItem({
       <Checkbox
         id={id}
         checked={subtask.done}
+        disabled={saving}
         onCheckedChange={(checked) => onToggle(checked)}
         className="border-foreground/30"
       />
@@ -36,6 +40,7 @@ function SubtaskItem({
       <Button
         variant="ghost"
         size="icon-xs"
+        disabled={saving}
         onClick={onDelete}
         aria-label={`Delete subtask ${subtask.title}`}
         className="text-muted-foreground"

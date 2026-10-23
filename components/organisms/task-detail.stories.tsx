@@ -1,6 +1,8 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite"
 import { expect, fn, waitFor } from "storybook/test"
 
+import { pendingSubtask } from "@/lib/tasks/optimistic"
+
 import { TaskDetail } from "./task-detail"
 import { lists, reviewTask, today } from "./workspace.fixtures"
 
@@ -108,5 +110,13 @@ export const WithoutSubtasks: Story = {
   play: async ({ canvas }) => {
     await expect(canvas.queryByRole("progressbar")).not.toBeInTheDocument()
     await expect(canvas.getByRole("textbox", { name: "New subtask" })).toBeInTheDocument()
+  },
+}
+
+export const SavingSubtask: Story = {
+  args: { task: { ...reviewTask, subtasks: [...reviewTask.subtasks, pendingSubtask("Update the changelog")] } },
+  play: async ({ canvas }) => {
+    await expect(canvas.getByRole("checkbox", { name: "Update the changelog" })).toHaveAttribute("aria-disabled", "true")
+    await expect(canvas.getByRole("checkbox", { name: reviewTask.subtasks[0].title })).not.toHaveAttribute("aria-disabled")
   },
 }

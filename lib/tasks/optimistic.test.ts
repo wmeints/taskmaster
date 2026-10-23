@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 
-import { applyChange } from "./optimistic"
+import { applyChange, isPending } from "./optimistic"
 import type { Task, Workspace } from "./types"
 
 const today = "2026-10-21"
@@ -99,6 +99,14 @@ describe("applyChange", () => {
 
     next = applyChange(next, { type: "delete-subtask", subtaskId: "sub-1" })
     expect(next.todo[0].subtasks.map((s) => s.title)).toEqual(["Leave review comments"])
+  })
+
+  it("marks a subtask added optimistically as pending until the server saves it", () => {
+    const next = applyChange(workspace, { type: "add-subtask", taskId: "review", title: "Leave review comments" })
+    const [saved, added] = next.todo[0].subtasks
+
+    expect(isPending(saved)).toBe(false)
+    expect(isPending(added)).toBe(true)
   })
 
   it("leaves the workspace untouched for an unknown task", () => {
