@@ -87,6 +87,20 @@ export const AddsAndOpensWithModEnter: Story = {
   },
 }
 
+// A tag that matches no list creates one with the task.
+export const AddsToANewList: Story = {
+  play: async ({ args, userEvent }) => {
+    await userEvent.type(await input(), 'Plan trip #"Summer holiday"')
+
+    const dialog = screen.getByRole("dialog", { name: "Search or command" })
+    await expect(dialog).toHaveTextContent("New list: Summer holiday")
+    await expect(screen.getByRole("option", { name: /Add “Plan trip” · Summer holiday/ })).toBeInTheDocument()
+
+    await userEvent.keyboard("{Enter}")
+    await expect(args.onAddTask).toHaveBeenCalledWith({ title: "Plan trip", due: null, listId: null, newList: "Summer holiday" })
+  },
+}
+
 export const DropsInInboxWithShiftEnter: Story = {
   play: async ({ args, userEvent }) => {
     await userEvent.type(await input(), typed)

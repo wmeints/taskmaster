@@ -65,4 +65,62 @@ describe("parseQuickAdd", () => {
   it("keeps a tag that matches no list in the title", () => {
     expect(parse("Plan trip #holiday")).toEqual({ title: "Plan trip #holiday", due: null, list: null })
   })
+
+  it("recognises ^ deadlines", () => {
+    expect(parse("Pay rent ^today")).toEqual({ title: "Pay rent", due: { date: today, time: null }, list: null })
+    expect(parse("^Tomorrow water plants")).toMatchObject({ title: "water plants", due: { date: "2026-10-22" } })
+    expect(parse("Plan sprint ^next week").due?.date).toBe("2026-10-26")
+    expect(parse("File taxes ^2026-12-01")).toMatchObject({ title: "File taxes", due: { date: "2026-12-01" } })
+  })
+
+  it("keeps a ^ that is not a deadline in the title", () => {
+    expect(parse("Fix ^2026-02-30")).toMatchObject({ title: "Fix ^2026-02-30", due: null })
+    expect(parse("Read ^someday")).toMatchObject({ title: "Read ^someday", due: null })
+  })
+
+  it("matches a quoted list name", () => {
+    expect(parse('Fix header #"Website relaunch" ^today')).toEqual({
+      title: "Fix header",
+      due: { date: today, time: null },
+      list: { id: "web", name: "Website relaunch", color: "blue" },
+    })
+    expect(parse("Sand floor #“home renovation”").list?.id).toBe("home")
+    expect(parse('Plan trip #"Summer holiday"').title).toBe('Plan trip #"Summer holiday"')
+  })
+
+  describe("with only ^ deadlines", () => {
+    const parseMarked = (text: string) => parseQuickAdd(text, { lists, today, naturalDates: false })
+
+    it("leaves bare dates and times in the title", () => {
+      expect(parseMarked("Plan friday party at 7pm")).toEqual({ title: "Plan friday party at 7pm", due: null, list: null })
+    })
+
+    it("still recognises ^ deadlines and lists", () => {
+      expect(parseMarked("Call the dentist tomorrow ^next week #home")).toEqual({
+        title: "Call the dentist tomorrow",
+        due: { date: "2026-10-26", time: null },
+        list: { id: "home", name: "Home renovation", color: "orange" },
+      })
+    })
+  })
+
+  describe("with new lists", () => {
+    const parseNew = (text: string) => parseQuickAdd(text, { lists, today, newLists: true })
+
+    it("takes a tag that matches no list as the name of a new list", () => {
+      expect(parseNew('Plan trip #"Summer holiday" ^tomorrow')).toEqual({
+        title: "Plan trip",
+        due: { date: "2026-10-22", time: null },
+        list: null,
+        newList: "Summer holiday",
+      })
+      expect(parseNew("Plan trip #holiday")).toMatchObject({ title: "Plan trip", newList: "holiday" })
+    })
+
+    it("still prefers a list that exists", () => {
+      const parsed = parseNew("Fix header #web")
+      expect(parsed.list?.id).toBe("web")
+      expect(parsed.newList).toBeUndefined()
+    })
+  })
 })

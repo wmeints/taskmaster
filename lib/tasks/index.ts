@@ -83,24 +83,34 @@ const load = cache(async (userId: string, today: string) => {
 // Returns the new task's id.
 export async function createTask(
   userId: string,
-  task: { title: string } & ({ scope: Scope; today: string } | { due: Due | null; listId: string | null }),
+  // newList names a list to create for the task, in place of any other list.
+  task: { title: string; newList?: string } & (
+    // A deadline or list given with a scope, such as one read from the title, overrides the scope's.
+    { scope: Scope; today: string; due?: Due; listId?: string } | { due: Due | null; listId: string | null }
+  ),
 ): Promise<string> {
-  const { title } = task;
+  const { title, newList } = task;
   let due: Due | null;
   let listId: string | null;
   if ("scope" in task) {
     const { scope, today } = task;
     const date = "view" in scope && scope.view !== "inbox" ? dateForPreset(scope.view, today) : null;
-    due = date ? { date, time: null } : null;
-    listId = "listId" in scope ? scope.listId : null;
+    due = task.due ?? (date ? { date, time: null } : null);
+    listId = task.listId ?? ("listId" in scope ? scope.listId : null);
   } else {
     ({ due, listId } = task);
   }
+  // The new list goes in with the task, so a failed insert leaves no empty list behind.
   const { rows } = await pool.query<{ id: string }>(
-    `insert into tasks (user_id, title, due_date, list_id, due_time)
-     values ($1, $2, $3, (select id from lists where id = $4 and user_id = $1), $5)
-     returning id`,
-    [userId, title, due?.date ?? null, listId, due?.time ?? null],
+    newList
+      ? `with new_list as (${insertList("$4", "$6")})
+         insert into tasks (user_id, title, due_date, list_id, due_time)
+         values ($1, $2, $3, (select id from new_list), $5)
+         returning id`
+      : `insert into tasks (user_id, title, due_date, list_id, due_time)
+         values ($1, $2, $3, (select id from lists where id = $4 and user_id = $1), $5)
+         returning id`,
+    [userId, title, due?.date ?? null, newList ?? listId, due?.time ?? null, ...(newList ? [[...listColors]] : [])],
   );
   return rows[0].id;
 }
@@ -157,13 +167,15 @@ export async function deleteSubtask(userId: string, subtaskId: string): Promise<
 
 // Creates a list with the next color in the palette. Returns the new list's id.
 export async function createList(userId: string, name: string): Promise<string> {
-  const { rows } = await pool.query<{ id: string }>(
-    `insert into lists (user_id, name, color)
-     values ($1, $2, ($3::text[])[(select count(*) from lists where user_id = $1) % array_length($3::text[], 1) + 1])
-     returning id`,
-    [userId, name, [...listColors]],
-  );
+  const { rows } = await pool.query<{ id: string }>(insertList("$2", "$3"), [userId, name, [...listColors]]);
   return rows[0].id;
+}
+
+// Inserts a list for the user in $1, giving it the next of the colors in the given parameter.
+function insertList(name: string, colors: string): string {
+  return `insert into lists (user_id, name, color)
+     values ($1, ${name}::text, (${colors}::text[])[(select count(*) from lists where user_id = $1) % array_length(${colors}::text[], 1) + 1])
+     returning id`;
 }
 
 // Deletes the user's list. Its tasks stay, without a list (the foreign key sets list_id to null).

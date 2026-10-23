@@ -83,3 +83,25 @@ export const Subtask: Story = {
     await expect(canvas.queryByText("add")).not.toBeInTheDocument()
   },
 }
+
+// A deadline and list read from the title show under the field as the user types.
+export const ShowsRecognised: Story = {
+  args: {
+    recognise: (title: string) => ({
+      deadline: title.includes("^tomorrow") ? "Tomorrow" : null,
+      list: title.includes("#home") ? { name: "Home renovation", color: "orange" as const } : null,
+    }),
+  },
+  play: async ({ canvas, canvasElement, userEvent }) => {
+    const input = canvas.getByRole("textbox", { name: "New task" })
+    await expect(canvasElement).not.toHaveTextContent("Recognised")
+
+    await userEvent.type(input, "Paint ^tomorrow")
+    await expect(canvasElement).toHaveTextContent("Deadline: Tomorrow")
+    await expect(canvasElement).not.toHaveTextContent("List:")
+
+    await userEvent.type(input, " #home{enter}")
+    await expect(input).toHaveValue("")
+    await expect(canvasElement).not.toHaveTextContent("Recognised")
+  },
+}

@@ -12,11 +12,12 @@ import { ViewTemplate } from "@/components/templates/view-template";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { useShortcuts } from "@/hooks/use-shortcuts";
-import { viewOf } from "@/lib/tasks/deadlines";
+import { describeDue, viewOf } from "@/lib/tasks/deadlines";
 import { headingFor } from "@/lib/tasks/headings";
 import { applyChange, type Change } from "@/lib/tasks/optimistic";
+import { parseQuickAdd } from "@/lib/tasks/quick-add";
 import { hrefFor } from "@/lib/tasks/routes";
-import { newTaskSchema, type TaskChanges } from "@/lib/tasks/schemas";
+import { newTaskSchema, type NewTaskValues, type TaskChanges } from "@/lib/tasks/schemas";
 import { plannerViews, viewTitles, type Task, type View, type Workspace } from "@/lib/tasks/types";
 import {
   addSubtaskAction,
@@ -103,8 +104,24 @@ export function WorkspaceScreen({
     return mutate({ type: "delete", taskId: task.id }, () => deleteTaskAction(task.id));
   }
 
-  async function addTask(values: { title: string }) {
-    const result = await createTaskAction(scope, values);
+  // "^next week" and "#home" in the title set the deadline and list instead of the view's or list's.
+  function readTitle(text: string) {
+    return parseQuickAdd(text, { lists: workspace.lists, today, naturalDates: false, newLists: true });
+  }
+
+  function recognise(text: string) {
+    const { due, list, newList } = readTitle(text);
+    return { deadline: due && describeDue(due, today), list, newList };
+  }
+
+  async function addTask(values: NewTaskValues) {
+    const { title, due, list, newList } = readTitle(values.title);
+    const result = await createTaskAction(scope, {
+      title,
+      ...(due && { due }),
+      ...(list && { listId: list.id }),
+      ...(newList && { newList }),
+    });
     if ("id" in result) setSelectedId(result.id);
     return result;
   }
@@ -194,6 +211,7 @@ export function WorkspaceScreen({
           schema={newTaskSchema}
           inputRef={quickAddRef}
           onAdd={addTask}
+          recognise={recognise}
         />
       </div>
       <TaskList
@@ -227,6 +245,7 @@ export function WorkspaceScreen({
               placeholder={`Add a task to ${workspace.title}…`}
               schema={newTaskSchema}
               inputRef={addRef}
+              recognise={recognise}
               onAdd={async (values) => {
                 const result = await addTask(values);
                 if ("id" in result) setAdding(false);

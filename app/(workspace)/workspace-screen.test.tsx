@@ -152,6 +152,38 @@ describe("WorkspaceScreen", () => {
     expect(actions.createTaskAction).toHaveBeenCalledWith({ view: "today" }, { title: "Order paint" })
   })
 
+  it("shows the deadline and list it recognises under the new task field", async () => {
+    renderScreen()
+
+    await userEvent.type(screen.getByRole("textbox", { name: "New task" }), "Plan friday party ^next week #home")
+
+    expect(screen.getByText("Deadline: Mon 26 Oct")).toBeInTheDocument()
+    expect(screen.getByText("List: Home renovation")).toBeInTheDocument()
+  })
+
+  it("creates a list it doesn't know for a new task", async () => {
+    renderScreen()
+
+    const input = screen.getByRole("textbox", { name: "New task" })
+    await userEvent.type(input, 'Plan trip #"Summer holiday"')
+    expect(screen.getByText("New list: Summer holiday")).toBeInTheDocument()
+
+    await userEvent.type(input, "{enter}")
+    expect(actions.createTaskAction).toHaveBeenCalledWith({ view: "today" }, { title: "Plan trip", newList: "Summer holiday" })
+  })
+
+  it("reads a ^ deadline and a # list out of a new task", async () => {
+    renderScreen()
+
+    const input = screen.getByRole("textbox", { name: "New task" })
+    await userEvent.type(input, 'Plan friday party ^next week #"Home renovation"{enter}')
+
+    expect(actions.createTaskAction).toHaveBeenCalledWith(
+      { view: "today" },
+      { title: "Plan friday party", due: { date: "2026-10-26", time: null }, listId: "1c2d3e4f-5a6b-4c7d-8e9f-0a1b2c3d4e5f" },
+    )
+  })
+
   it("hides and shows completed tasks with H", () => {
     renderScreen()
 

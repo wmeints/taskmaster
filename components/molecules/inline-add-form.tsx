@@ -3,15 +3,17 @@
 import { useId } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { CornerDownLeftIcon, PlusIcon } from "lucide-react"
-import { Controller, useForm } from "react-hook-form"
+import { Controller, useForm, useWatch } from "react-hook-form"
 import { cn } from "cn"
 
+import { RecognisedBar, type Recognised } from "@/components/molecules/recognised-bar"
 import { Field, FieldError, FieldLabel } from "@/components/ui/field"
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group"
 import { Kbd } from "@/components/ui/kbd"
 import type { newTaskSchema, NewTaskValues } from "@/lib/tasks/schemas"
 
-// A one-line form that adds an item on Enter and stays focused for the next one.
+// A one-line form that adds an item on Enter and stays focused for the next one. Given recognise, it
+// shows the deadline and list read from the title under the field as the user types.
 function InlineAddForm({
   label,
   placeholder,
@@ -19,6 +21,7 @@ function InlineAddForm({
   onAdd,
   inputRef,
   variant = "solid",
+  recognise,
 }: {
   label: string
   placeholder: string
@@ -27,9 +30,12 @@ function InlineAddForm({
   onAdd: (values: NewTaskValues) => Promise<{ error: string } | unknown>
   inputRef?: React.RefObject<HTMLInputElement | null>
   variant?: "solid" | "dashed"
+  recognise?: (title: string) => Recognised
 }) {
   const id = useId()
   const form = useForm<NewTaskValues>({ resolver: zodResolver(schema), defaultValues: { title: "" } })
+  const title = useWatch({ control: form.control, name: "title" })
+  const recognised = recognise?.(title)
 
   async function onSubmit(values: NewTaskValues) {
     const result = await onAdd(values)
@@ -85,6 +91,9 @@ function InlineAddForm({
                 </InputGroupAddon>
               )}
             </InputGroup>
+            {recognised && (recognised.deadline || recognised.list || recognised.newList) && (
+              <RecognisedBar {...recognised} variant="inline" />
+            )}
             {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
           </Field>
         )}

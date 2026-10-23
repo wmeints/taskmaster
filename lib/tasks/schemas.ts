@@ -31,8 +31,22 @@ export const taskChangesSchema = z
   })
   .partial()
 
-// A task from the command palette, with the deadline and list read from its text.
-export const quickAddSchema = z.object({ title: title("Enter a task"), due: due.nullable(), listId: z.uuid().nullable() })
+// A task added to the open view or list, with any deadline and list read from its text;
+// newList names a list to create for it.
+export const scopedTaskSchema = newTaskSchema.extend({
+  due: due.optional(),
+  listId: z.uuid().optional(),
+  newList: listSchema.shape.name.optional(),
+})
+
+// A task from the command palette, with the deadline and list read from its text; newList names a list
+// to create for it.
+export const quickAddSchema = z.object({
+  title: title("Enter a task"),
+  due: due.nullable(),
+  listId: z.uuid().nullable(),
+  newList: listSchema.shape.name.optional(),
+})
 
 export const scopeSchema = z.union([
   z.object({ view: z.enum(["inbox", "today", "tomorrow", "end-of-week", "later"]) }),
@@ -44,4 +58,5 @@ export type TaskDetailsValues = z.infer<typeof taskDetailsSchema>
 export type SubtaskValues = z.infer<typeof subtaskSchema>
 export type ListValues = z.infer<typeof listSchema>
 export type TaskChanges = z.infer<typeof taskChangesSchema>
+export type ScopedTaskValues = z.infer<typeof scopedTaskSchema>
 export type QuickAddValues = z.infer<typeof quickAddSchema>

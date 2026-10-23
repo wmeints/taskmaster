@@ -57,8 +57,42 @@ describe("createTaskAction", () => {
     expect(refresh).toHaveBeenCalled()
   })
 
+  it("passes on a deadline and list read from the title", async () => {
+    const homeId = "22222222-2222-4222-8222-222222222222"
+    tasks.createTask.mockResolvedValue(taskId)
+
+    await createTaskAction({ view: "today" }, { title: "Buy paint", due: { date: "2026-10-26", time: null }, listId: homeId })
+
+    expect(tasks.createTask).toHaveBeenCalledWith("user-1", {
+      title: "Buy paint",
+      due: { date: "2026-10-26", time: null },
+      listId: homeId,
+      scope: { view: "today" },
+      today: "2026-10-21",
+    })
+  })
+
+  it("passes on a new list to create for the task", async () => {
+    tasks.createTask.mockResolvedValue(taskId)
+
+    await createTaskAction({ view: "today" }, { title: "Plan trip", newList: " Summer holiday " })
+
+    expect(tasks.createTask).toHaveBeenCalledWith("user-1", {
+      title: "Plan trip",
+      newList: "Summer holiday",
+      scope: { view: "today" },
+      today: "2026-10-21",
+    })
+  })
+
   it("rejects invalid input", async () => {
+    await expect(createTaskAction({ view: "today" }, { title: "Plan trip", newList: "x".repeat(101) })).resolves.toEqual({
+      error: "Keep it under 100 characters",
+    })
     await expect(createTaskAction({ view: "today" }, { title: "" })).resolves.toEqual({ error: "Enter a task" })
+    await expect(
+      createTaskAction({ view: "today" }, { title: "Buy paint", due: { date: "friday", time: null } }),
+    ).resolves.toEqual({ error: expect.any(String) })
     await expect(createTaskAction({ view: "someday" } as never, { title: "Buy paint" })).resolves.toEqual({
       error: "Invalid request",
     })
@@ -75,6 +109,19 @@ describe("createTaskAction", () => {
 
 describe("quickAddTaskAction", () => {
   const homeId = "22222222-2222-4222-8222-222222222222"
+
+  it("passes on a new list to create for the task", async () => {
+    tasks.createTask.mockResolvedValue(taskId)
+
+    await quickAddTaskAction({ title: "Plan trip", due: null, listId: null, newList: "Summer holiday" })
+
+    expect(tasks.createTask).toHaveBeenCalledWith("user-1", {
+      title: "Plan trip",
+      due: null,
+      listId: null,
+      newList: "Summer holiday",
+    })
+  })
 
   it("creates the task with the recognised deadline and list", async () => {
     tasks.createTask.mockResolvedValue(taskId)

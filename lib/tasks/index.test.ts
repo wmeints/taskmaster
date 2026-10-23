@@ -212,6 +212,36 @@ describe("createTask", () => {
 
     expect(pool.query.mock.calls[0][1]).toEqual([userId, "Buy paint", null, homeId, null])
   })
+
+  it("creates a new list for the task in the same statement", async () => {
+    await createTask(userId, { title: "Plan trip", scope: { listId: homeId }, today, newList: "Summer holiday" })
+
+    expect(pool.query).toHaveBeenCalledTimes(1)
+    const [sql, params] = pool.query.mock.calls[0]
+    expect(sql).toContain("insert into lists")
+    expect(sql).toContain("insert into tasks")
+    expect(params).toEqual(
+      expect.arrayContaining([userId, "Plan trip", "Summer holiday", expect.arrayContaining(["blue", "orange"])]),
+    )
+    expect(params).not.toContain(homeId)
+  })
+
+  it("can create a new list alongside an explicit deadline", async () => {
+    await createTask(userId, { title: "Plan trip", due: null, listId: null, newList: "Summer holiday" })
+
+    const [sql, params] = pool.query.mock.calls[0]
+    expect(sql).toContain("insert into lists")
+    expect(params).toContain("Summer holiday")
+  })
+
+  it("lets a deadline or list read from the title override the scope's", async () => {
+    const due = { date: "2026-10-26", time: null }
+    await createTask(userId, { title: "Buy paint", scope: { view: "today" }, today, due })
+    await createTask(userId, { title: "Buy paint", scope: { listId: websiteId }, today, listId: homeId })
+
+    expect(pool.query.mock.calls[0][1]).toEqual([userId, "Buy paint", "2026-10-26", null, null])
+    expect(pool.query.mock.calls[1][1]).toEqual([userId, "Buy paint", null, homeId, null])
+  })
 })
 
 describe("updateTask", () => {

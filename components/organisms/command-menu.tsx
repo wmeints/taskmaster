@@ -55,7 +55,7 @@ function CommandMenu({
   const text = query.trim()
   const commandsOnly = text.startsWith(">")
   const filter = (commandsOnly ? text.slice(1) : text).trim().toLowerCase()
-  const parsed = text && !commandsOnly ? parseQuickAdd(text, { lists, today }) : null
+  const parsed = text && !commandsOnly ? parseQuickAdd(text, { lists, today, newLists: true }) : null
   const matches = parsed ? searchTasks(parsed.title || text, searchable, { limit: 6 }) : []
   const views = (Object.keys(viewTitles) as View[]).filter((view) => viewTitles[view].toLowerCase().includes(filter))
   const shownLists = lists.filter((list) => list.name.toLowerCase().includes(filter))
@@ -81,7 +81,12 @@ function CommandMenu({
     const values: QuickAddValues =
       mode === "inbox"
         ? { title: text, due: null, listId: null }
-        : { title: parsed.title, due: parsed.due, listId: parsed.list?.id ?? null }
+        : {
+            title: parsed.title,
+            due: parsed.due,
+            listId: parsed.list?.id ?? null,
+            ...(parsed.newList && { newList: parsed.newList }),
+          }
     if (!values.title) return
 
     startAdding(async () => {
@@ -91,6 +96,7 @@ function CommandMenu({
         return
       }
       changeOpen(false)
+      // A new list's id isn't known here, so a task added to one opens in its view instead.
       if (mode === "open") {
         const scope = values.listId ? { listId: values.listId } : { view: viewOf(values.due?.date ?? null, today) }
         onNavigate(hrefFor(scope, result.id))
@@ -122,7 +128,11 @@ function CommandMenu({
           trailing={<Kbd className="border bg-background">Esc</Kbd>}
         />
         {parsed && (
-          <RecognisedBar deadline={parsed.due && describeDue(parsed.due, today)} list={parsed.list} />
+          <RecognisedBar
+            deadline={parsed.due && describeDue(parsed.due, today)}
+            list={parsed.list}
+            newList={parsed.newList}
+          />
         )}
         {error && (
           <p role="alert" className="border-b px-4 py-2 text-sm text-destructive">
@@ -138,7 +148,9 @@ function CommandMenu({
                   <CreateItem value="create-add" icon={PlusIcon} primary keys="↵" onSelect={() => add("add")}>
                     <span className="font-medium">Add “{parsed.title}”</span>
                     {parsed.due && <> <span className="text-muted-foreground">· {describeDue(parsed.due, today)}</span></>}
-                    {parsed.list && <> <span className="text-muted-foreground">· {parsed.list.name}</span></>}
+                    {(parsed.list || parsed.newList) && (
+                      <> <span className="text-muted-foreground">· {parsed.list?.name ?? parsed.newList}</span></>
+                    )}
                   </CreateItem>
                   <CreateItem value="create-open" icon={AlignLeftIcon} keys="⌘↵" onSelect={() => add("open")}>
                     Add and open details <span className="text-muted-foreground">· description, subtasks</span>

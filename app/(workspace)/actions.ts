@@ -7,14 +7,14 @@ import { getCurrentUser } from "@/lib/accounts";
 import * as tasks from "@/lib/tasks";
 import {
   listSchema,
-  newTaskSchema,
   quickAddSchema,
+  scopedTaskSchema,
   scopeSchema,
   subtaskSchema,
   taskChangesSchema,
   type ListValues,
-  type NewTaskValues,
   type QuickAddValues,
+  type ScopedTaskValues,
   type SubtaskValues,
   type TaskChanges,
 } from "@/lib/tasks/schemas";
@@ -26,10 +26,10 @@ type ActionResult = { error: string } | undefined;
 
 const id = z.uuid();
 
-export async function createTaskAction(scope: Scope, values: NewTaskValues): Promise<{ id: string } | { error: string }> {
+export async function createTaskAction(scope: Scope, values: ScopedTaskValues): Promise<{ id: string } | { error: string }> {
   const userId = await requireUserId();
   const parsedScope = scopeSchema.safeParse(scope);
-  const parsed = newTaskSchema.safeParse(values);
+  const parsed = scopedTaskSchema.safeParse(values);
   if (!parsedScope.success) return invalid();
   if (!parsed.success) return { error: parsed.error.issues[0].message };
 

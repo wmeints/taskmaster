@@ -34,3 +34,22 @@ export const NothingRecognised: Story = {
     await expect(canvasElement).toHaveTextContent("Dates like “fri” · # for a list")
   },
 }
+
+// Under a form field: no border and no hint.
+export const Inline: Story = {
+  args: { variant: "inline" },
+  play: async ({ canvasElement }) => {
+    await expect(canvasElement).toHaveTextContent("Deadline: Tomorrow")
+    await expect(canvasElement).toHaveTextContent("List: Home renovation")
+    await expect(canvasElement).not.toHaveTextContent("Dates like")
+  },
+}
+
+// A list that doesn't exist yet and will be created with the task.
+export const NewList: Story = {
+  args: { variant: "inline", deadline: null, list: null, newList: "Summer holiday" },
+  play: async ({ canvasElement }) => {
+    await expect(canvasElement).toHaveTextContent("Recognised")
+    await expect(canvasElement).toHaveTextContent("New list: Summer holiday")
+  },
+}
